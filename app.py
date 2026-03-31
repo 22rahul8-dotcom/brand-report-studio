@@ -270,10 +270,13 @@ def api_enhance_topic():
         if not topic:
             return jsonify({"error": "Topic is required"}), 400
 
-        groq_key = os.environ.get("GROQ_API_KEY")
-        if groq_key:
-            from groq import Groq as GroqClient
-            client = GroqClient(api_key=groq_key)
+        or_key = os.environ.get("OPENROUTER_API_KEY")
+        if or_key:
+            from openai import OpenAI as OpenAIClient
+            client = OpenAIClient(
+                api_key=or_key,
+                base_url="https://openrouter.ai/api/v1",
+            )
             prompt = f"""You are a business analyst. Expand this report brief into a detailed, specific report description (2-3 sentences, max 60 words).
 
 Company: {company}
@@ -281,7 +284,7 @@ Brief: {topic}
 
 Return ONLY the enhanced description. No preamble, no quotes."""
             response = client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
+                model="meta-llama/llama-3.3-70b-instruct:free",
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=120,
                 temperature=0.4,
@@ -347,12 +350,15 @@ def api_report():
         company = brand.get("company", slug.title())
         report_title = title or f"{company} — Company Overview"
 
-        # Phase 3: Structure content with Groq (free tier)
-        groq_key = os.environ.get("GROQ_API_KEY")
-        if groq_key and markdown:
-            from groq import Groq as GroqClient
-            groq_client = GroqClient(api_key=groq_key)
-            structured = _structure_with_groq(groq_client, markdown, company, report_title, data.get("describe", ""))
+        # Phase 3: Structure content with OpenRouter (free tier)
+        or_key = os.environ.get("OPENROUTER_API_KEY")
+        if or_key and markdown:
+            from openai import OpenAI as OpenAIClient
+            or_client = OpenAIClient(
+                api_key=or_key,
+                base_url="https://openrouter.ai/api/v1",
+            )
+            structured = _structure_with_groq(or_client, markdown, company, report_title, data.get("describe", ""))
         else:
             structured = _auto_structure(markdown, company, report_title, data.get("describe", ""))
 
@@ -378,7 +384,7 @@ def api_report():
 
 
 def _structure_with_groq(client, markdown: str, company: str, title: str, describe: str = "") -> dict:
-    """Use Groq (Llama) to structure scraped content into magazine sections."""
+    """Use OpenRouter (Llama) to structure scraped content into magazine sections."""
     import re, json as _json
 
     # Clean the markdown before sending to LLM
@@ -472,7 +478,7 @@ SCRAPED CONTENT TO USE:
 {clean_md[:8000]}"""
 
     response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        model="meta-llama/llama-3.3-70b-instruct:free",
         messages=[{"role": "user", "content": prompt}],
         max_tokens=4096,
         temperature=0.3,
