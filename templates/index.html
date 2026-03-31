@@ -1,0 +1,1339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Brand Report Studio</title>
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --surface: #13131a;
+      --surface2: #1a1a24;
+      --border: #2a2a3a;
+      --text: #e4e4ec;
+      --text2: #8888a0;
+      --accent: #f97316;
+      --accent2: #fb923c;
+      --red: #ef4444;
+      --green: #22c55e;
+      --radius: 10px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .app { max-width: 1100px; margin: 0 auto; padding: 24px 20px; }
+
+    header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 32px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    header .logo { font-size: 28px; }
+    header h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+    header .tagline { color: var(--text2); font-size: 13px; margin-left: auto; }
+
+    /* Primary tabs */
+    .tabs {
+      display: flex;
+      gap: 4px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 4px;
+      margin-bottom: 24px;
+    }
+    .tab {
+      flex: 1;
+      padding: 10px 16px;
+      background: transparent;
+      border: none;
+      border-radius: 7px;
+      color: var(--text2);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .tab:hover { color: var(--text); background: var(--surface2); }
+    .tab.active { background: var(--accent); color: #fff; font-weight: 600; }
+
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    /* Cards */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+
+    /* Form elements */
+    .form-row { margin-bottom: 16px; }
+    .form-row label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text2);
+      margin-bottom: 6px;
+    }
+    .form-row input, .form-row textarea, .form-row select {
+      width: 100%;
+      padding: 10px 14px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color .15s;
+    }
+    .form-row input:focus, .form-row textarea:focus { border-color: var(--accent); }
+    .form-row textarea { resize: vertical; min-height: 90px; }
+
+    /* Buttons */
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent2); }
+    .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-secondary {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-secondary.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+    /* Spinner */
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Result areas */
+    .result-area {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .result-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface2);
+    }
+    .status {
+      font-size: 12px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 20px;
+    }
+    .status.ok  { background: rgba(34,197,94,.15); color: var(--green); }
+    .status.err { background: rgba(239,68,68,.15);  color: var(--red); }
+    .result-body { padding: 16px; max-height: 600px; overflow-y: auto; }
+    .result-body pre { font-size: 12px; color: var(--text2); white-space: pre-wrap; word-break: break-word; }
+
+    /* Result tabs */
+    .result-tabs {
+      display: flex;
+      gap: 2px;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      overflow-x: auto;
+    }
+    .result-tab {
+      padding: 4px 12px;
+      font-size: 12px;
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      color: var(--text2);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .result-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .result-pane { display: none; }
+    .result-pane.active { display: block; }
+
+    /* Step indicators */
+    .steps {
+      display: flex;
+      gap: 0;
+      margin-bottom: 24px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .step {
+      flex: 1;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-right: 1px solid var(--border);
+      opacity: 0.4;
+    }
+    .step:last-child { border-right: none; }
+    .step.active { opacity: 1; }
+    .step.done { opacity: 0.7; }
+    .step-num {
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700; flex-shrink: 0;
+    }
+    .step.active .step-num { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .step.done .step-num { background: var(--green); border-color: var(--green); color: #fff; }
+    .step-label { font-size: 13px; font-weight: 500; }
+    .step-sub { font-size: 11px; color: var(--text2); }
+
+    /* Brand asset grid */
+    .brand-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    @media (max-width: 700px) { .brand-grid { grid-template-columns: 1fr; } }
+    .brand-section {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .brand-section-title {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 12px;
+    }
+
+    /* Color swatches */
+    .color-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+    .color-swatch {
+      display: flex; flex-direction: column; align-items: center; gap: 5px;
+      cursor: pointer;
+    }
+    .swatch-box {
+      width: 52px; height: 52px; border-radius: 8px;
+      border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 9px; font-weight: 600;
+      position: relative; overflow: hidden;
+    }
+    .swatch-name { font-size: 10px; color: var(--text2); text-align: center; max-width: 52px; }
+    .swatch-input {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+    }
+
+    /* Font display */
+    .font-card {
+      padding: 12px;
+      background: var(--bg);
+      border-radius: 8px;
+      margin-bottom: 8px;
+    }
+    .font-role { font-size: 10px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 4px; }
+    .font-name { font-size: 20px; font-weight: 600; color: var(--text); }
+    .font-sample { font-size: 13px; color: var(--text2); margin-top: 4px; }
+
+    /* Component preview */
+    .comp-grid { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+    .comp-item { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+    .comp-label { font-size: 10px; color: var(--text2); }
+
+    /* Personality tags */
+    .tag-list { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tag {
+      padding: 4px 10px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      font-size: 12px;
+      color: var(--text);
+    }
+
+    /* Report preview */
+    .report-preview-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+    }
+    .download-btns { display: flex; gap: 8px; }
+
+    /* Advanced tools toggle */
+    .advanced-toggle {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 0;
+      cursor: pointer;
+      color: var(--text2);
+      font-size: 13px;
+      border: none; background: none;
+      margin-bottom: 8px;
+    }
+    .advanced-toggle:hover { color: var(--text); }
+    .advanced-toggle .arrow { transition: transform .2s; }
+    .advanced-toggle.open .arrow { transform: rotate(90deg); }
+
+    .advanced-content { display: none; }
+    .advanced-content.open { display: block; }
+
+    /* Checkbox rows */
+    .checkbox-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; }
+    .checkbox-item { display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
+    .checkbox-item input { accent-color: var(--accent); }
+
+    /* Actions builder */
+    .actions-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+    .action-row {
+      display: flex; gap: 8px; align-items: center;
+      padding: 8px 12px;
+      background: var(--surface2); border-radius: 8px; font-size: 13px;
+    }
+    .action-row select, .action-row input { flex: 1; padding: 6px 10px; font-size: 13px; }
+    .action-row .remove-action {
+      background: none; border: none; color: var(--red); cursor: pointer; font-size: 16px; padding: 4px;
+    }
+
+    /* Progress message */
+    .progress-msg {
+      display: flex; align-items: center; gap: 10px;
+      padding: 14px 16px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 13px; color: var(--text2);
+      margin-bottom: 16px;
+    }
+
+    @media (max-width: 640px) { .tabs { flex-wrap: wrap; } }
+
+    /* Topic suggestion system */
+    .topic-section { margin-bottom: 20px; }
+    .topic-section-label {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.12em;
+      text-transform: uppercase; color: var(--text2); margin-bottom: 10px; display: block;
+    }
+    .topic-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
+    .topic-chip {
+      display: flex; align-items: center; gap: 6px;
+      padding: 7px 13px; border-radius: 20px;
+      border: 1px solid var(--border);
+      background: var(--surface2); color: var(--text);
+      font-size: 13px; cursor: pointer; transition: all .15s;
+      user-select: none;
+    }
+    .topic-chip:hover { border-color: var(--accent); color: var(--accent); }
+    .topic-chip.selected { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .topic-chip .chip-icon { font-size: 14px; }
+    .topic-suggest-btn {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 12px; border-radius: 6px;
+      border: 1px solid var(--border); background: var(--surface2);
+      color: var(--text2); font-size: 12px; cursor: pointer; transition: all .15s;
+    }
+    .topic-suggest-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .topic-suggest-btn.loading { opacity: .6; pointer-events: none; }
+    /* Describe field row */
+    .describe-wrapper { position: relative; }
+    .enhance-btn {
+      position: absolute; bottom: 10px; right: 10px;
+      display: flex; align-items: center; gap: 5px;
+      padding: 5px 12px; border-radius: 6px;
+      border: 1px solid var(--border); background: var(--surface);
+      color: var(--text2); font-size: 11px; font-weight: 600;
+      cursor: pointer; transition: all .15s; z-index: 2;
+    }
+    .enhance-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--bg); }
+    .enhance-btn.loading { opacity: .6; pointer-events: none; }
+    .describe-wrapper textarea { padding-bottom: 44px; }
+    .brand-topics-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+
+    /* Welcome banner */
+    .welcome {
+      background: linear-gradient(135deg, rgba(249,115,22,.1) 0%, rgba(249,115,22,.04) 100%);
+      border: 1px solid rgba(249,115,22,.25);
+      border-radius: var(--radius);
+      padding: 18px 22px;
+      margin-bottom: 24px;
+      display: flex; gap: 16px; align-items: flex-start;
+    }
+    .welcome-icon { font-size: 28px; flex-shrink: 0; }
+    .welcome h2 { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+    .welcome p { font-size: 13px; color: var(--text2); line-height: 1.6; }
+    .welcome-steps {
+      display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap;
+    }
+    .welcome-step {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 12px; color: var(--text2);
+    }
+    .welcome-step .ws-num {
+      width: 18px; height: 18px; border-radius: 50%;
+      background: var(--accent); color: #fff;
+      font-size: 10px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .welcome-step .ws-arrow { color: var(--border); font-size: 10px; }
+
+    /* Inline hint box */
+    .hint-box {
+      display: flex; gap: 10px; align-items: flex-start;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: 8px; padding: 12px 14px; margin-bottom: 18px;
+      font-size: 12px; color: var(--text2); line-height: 1.6;
+    }
+    .hint-box strong { color: var(--text); }
+
+    /* Guide */
+    .guide-section { margin-bottom: 28px; }
+    .guide-section h2 {
+      font-size: 15px; font-weight: 700; color: var(--text);
+      margin-bottom: 14px; padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .guide-section h2 .badge {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; padding: 2px 8px; border-radius: 20px;
+      background: rgba(249,115,22,.15); color: var(--accent);
+    }
+    .guide-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 700px) { .guide-cards { grid-template-columns: 1fr; } }
+    .guide-card {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 10px; padding: 16px;
+    }
+    .guide-card-title {
+      font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 6px;
+    }
+    .guide-card p {
+      font-size: 13px; color: var(--text2); line-height: 1.6; margin-bottom: 10px;
+    }
+    .guide-card p:last-child { margin-bottom: 0; }
+    .guide-steps-list {
+      list-style: none; display: flex; flex-direction: column; gap: 8px;
+    }
+    .guide-steps-list li {
+      display: flex; gap: 10px; align-items: flex-start;
+      font-size: 13px; color: var(--text2); line-height: 1.5;
+    }
+    .guide-steps-list li .n {
+      flex-shrink: 0; width: 20px; height: 20px; border-radius: 50%;
+      background: var(--accent); color: #fff; font-size: 11px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center; margin-top: 1px;
+    }
+    .guide-tip {
+      display: flex; gap: 10px; align-items: flex-start;
+      background: rgba(249,115,22,.08); border: 1px solid rgba(249,115,22,.2);
+      border-radius: 8px; padding: 12px 14px; margin-top: 14px;
+      font-size: 12px; color: var(--text2); line-height: 1.5;
+    }
+    .guide-tip .tip-icon { font-size: 16px; flex-shrink: 0; }
+    .guide-note {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 12px 14px;
+      font-size: 12px; color: var(--text2); line-height: 1.6;
+    }
+    .guide-note code {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 4px; padding: 1px 6px; font-size: 11px; color: var(--accent);
+    }
+    .guide-full { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 14px; }
+    .guide-full p { font-size: 13px; color: var(--text2); line-height: 1.6; margin-bottom: 10px; }
+    .guide-full p:last-child { margin-bottom: 0; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="logo">&#128293;</div>
+      <h1>Brand Report Studio</h1>
+      <span class="tagline">Enter a URL. Get a branded report.</span>
+    </header>
+
+    <!-- Welcome banner -->
+    <div class="welcome">
+      <div class="welcome-icon">&#128293;</div>
+      <div>
+        <h2>Welcome to Brand Report Studio</h2>
+        <p>This tool turns any company website into a branded intelligence report — automatically extracting colors, fonts, and content. No setup needed beyond your API key.</p>
+        <div class="welcome-steps">
+          <div class="welcome-step"><div class="ws-num">1</div> Pick a tab below</div>
+          <div class="welcome-step"><span class="ws-arrow">›</span></div>
+          <div class="welcome-step"><div class="ws-num">2</div> Paste a URL</div>
+          <div class="welcome-step"><span class="ws-arrow">›</span></div>
+          <div class="welcome-step"><div class="ws-num">3</div> Hit the button</div>
+          <div class="welcome-step"><span class="ws-arrow">›</span></div>
+          <div class="welcome-step"><div class="ws-num">4</div> Get results instantly</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Primary tabs -->
+    <div class="tabs">
+      <button class="tab active" data-tab="discover">&#127752; Brand Discovery</button>
+      <button class="tab" data-tab="report">&#128196; Report Generator</button>
+      <button class="tab" data-tab="tools">&#128295; Tools</button>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════
+         TAB 1: BRAND DISCOVERY
+    ════════════════════════════════════════════════════ -->
+    <div id="discover" class="panel active">
+      <div class="hint-box">
+        <div>
+          <strong>Brand Discovery</strong> — Paste any company's homepage URL and hit <em>Discover Brand</em>. The tool will extract their color palette, fonts, logo, and brand personality. Use this to understand a brand before generating a report.
+        </div>
+      </div>
+      <div class="card">
+        <div class="form-row">
+          <label>Brand URL</label>
+          <input type="text" id="discover-url" placeholder="https://stripe.com" />
+        </div>
+        <div style="display:flex;gap:12px;align-items:center">
+          <button class="btn btn-primary" id="discover-btn" onclick="doDiscover()">
+            Discover Brand
+          </button>
+          <span id="discover-status" style="font-size:12px;color:var(--text2)"></span>
+        </div>
+      </div>
+      <div id="discover-result"></div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════
+         TAB 2: REPORT GENERATOR
+    ════════════════════════════════════════════════════ -->
+    <div id="report" class="panel">
+      <div class="hint-box">
+        <div>
+          <strong>Report Generator</strong> — Enter a company URL and describe what the report should cover (e.g. "annual growth, key metrics, product highlights"). The tool scrapes the site, applies the brand's own colors &amp; fonts, and generates a downloadable HTML report. Add a <strong>GROQ_API_KEY</strong> env var to get AI-structured sections; otherwise it auto-structures the content.
+        </div>
+      </div>
+
+      <!-- Steps indicator -->
+      <div class="steps" id="report-steps">
+        <div class="step active" id="step-1">
+          <div class="step-num">1</div>
+          <div><div class="step-label">Brand URL</div><div class="step-sub">Company website</div></div>
+        </div>
+        <div class="step" id="step-2">
+          <div class="step-num">2</div>
+          <div><div class="step-label">Report Goal</div><div class="step-sub">What to cover</div></div>
+        </div>
+        <div class="step" id="step-3">
+          <div class="step-num">3</div>
+          <div><div class="step-label">Generate</div><div class="step-sub">AI + brand styling</div></div>
+        </div>
+        <div class="step" id="step-4">
+          <div class="step-num">4</div>
+          <div><div class="step-label">Download</div><div class="step-sub">HTML or PDF</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div class="form-row" style="margin-bottom:0">
+            <label>Company URL</label>
+            <input type="text" id="report-url" placeholder="https://stripe.com" />
+          </div>
+          <div class="form-row" style="margin-bottom:0">
+            <label>Report Title (optional)</label>
+            <input type="text" id="report-title" placeholder="e.g. Stripe — Annual Growth Report 2026" />
+          </div>
+        </div>
+
+        <!-- Topic suggestion chips -->
+        <div id="topic-section" style="margin-top:16px;display:none">
+          <div class="topic-section">
+            <span class="topic-section-label">&#128161; Quick Topics — click to populate the describe field</span>
+            <div id="generic-chips" class="topic-chips"></div>
+          </div>
+          <div id="brand-topics-container" style="display:none">
+            <div class="brand-topics-row">
+              <span class="topic-section-label" style="margin-bottom:0">&#127775; Brand-Specific</span>
+            </div>
+            <div id="brand-chips" class="topic-chips"></div>
+          </div>
+        </div>
+
+        <div class="form-row" style="margin-top:16px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <label style="margin-bottom:0">What should the report cover?</label>
+            <button class="topic-suggest-btn" id="suggest-btn" onclick="fetchTopics()">
+              &#10024; Suggest Topics
+            </button>
+          </div>
+          <div class="describe-wrapper">
+            <textarea id="report-describe" rows="4" placeholder="e.g. Sales performance and annual growth for last year. Include revenue trends, key metrics, product highlights, and strategic recommendations for next year."></textarea>
+            <button class="enhance-btn" id="enhance-btn" onclick="enhanceTopic()">
+              &#128161; AI Enhance
+            </button>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:12px;align-items:center;margin-top:4px">
+          <button class="btn btn-primary" id="report-btn" onclick="doReport()">
+            Generate Report
+          </button>
+          <span id="report-status" style="font-size:12px;color:var(--text2)"></span>
+        </div>
+      </div>
+
+      <div id="report-result"></div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════
+         TAB 3: TOOLS (Scrape, Extract JSON, Batch)
+    ════════════════════════════════════════════════════ -->
+    <div id="tools" class="panel">
+      <div class="hint-box">
+        <div>
+          <strong>Tools</strong> — Three raw scraping utilities. <strong>Scrape</strong> fetches any URL as markdown, HTML, links, or a screenshot. <strong>Extract JSON</strong> pulls structured data using a plain-English prompt or JSON schema. <strong>Batch Scrape</strong> processes multiple URLs at once — paste one URL per line.
+        </div>
+      </div>
+
+      <!-- Scrape -->
+      <button class="advanced-toggle open" onclick="toggleSection(this, 'scrape-content')">
+        <span class="arrow">▶</span> Scrape — fetch any URL as markdown / HTML / links / screenshot
+      </button>
+      <div id="scrape-content" class="advanced-content open">
+        <div class="card">
+          <div class="form-row">
+            <label>URL to scrape</label>
+            <input type="text" id="scrape-url" placeholder="https://example.com" />
+          </div>
+          <div class="form-row">
+            <label>Output formats</label>
+            <div class="checkbox-row">
+              <label class="checkbox-item"><input type="checkbox" value="markdown" checked /> Markdown</label>
+              <label class="checkbox-item"><input type="checkbox" value="html" /> HTML</label>
+              <label class="checkbox-item"><input type="checkbox" value="links" /> Links</label>
+              <label class="checkbox-item"><input type="checkbox" value="screenshot" /> Screenshot</label>
+              <label class="checkbox-item"><input type="checkbox" value="summary" /> Summary</label>
+              <label class="checkbox-item"><input type="checkbox" value="images" /> Images</label>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+            <div class="form-row" style="margin-bottom:0">
+              <label>Country (optional)</label>
+              <input type="text" id="scrape-country" placeholder="US, DE, JP…" />
+            </div>
+            <div class="form-row" style="margin-bottom:0">
+              <label>Languages (optional)</label>
+              <input type="text" id="scrape-languages" placeholder="en, es, de…" />
+            </div>
+            <div class="form-row" style="margin-bottom:0">
+              <label>Cache max age ms (0=fresh)</label>
+              <input type="number" id="scrape-maxage" placeholder="172800000" />
+            </div>
+          </div>
+          <div class="form-row" style="margin-top:16px">
+            <label>Page actions (optional)</label>
+            <div id="actions-list" class="actions-list"></div>
+            <button class="btn btn-secondary" onclick="addAction()" style="font-size:12px">+ Add Action</button>
+          </div>
+          <button class="btn btn-primary" id="scrape-btn" onclick="doScrape()" style="margin-top:8px">Scrape</button>
+        </div>
+        <div id="scrape-result"></div>
+      </div>
+
+      <!-- Extract JSON -->
+      <button class="advanced-toggle" onclick="toggleSection(this, 'extract-content')">
+        <span class="arrow">▶</span> Extract JSON — pull structured data from any page
+      </button>
+      <div id="extract-content" class="advanced-content">
+        <div class="card">
+          <div class="form-row">
+            <label>URL</label>
+            <input type="text" id="extract-url" placeholder="https://example.com" />
+          </div>
+          <div class="form-row">
+            <label>Extraction prompt (plain English)</label>
+            <input type="text" id="extract-prompt" placeholder="Extract all product names and prices" />
+          </div>
+          <div class="form-row">
+            <label>JSON Schema (optional, overrides prompt)</label>
+            <textarea id="extract-schema" rows="4" placeholder='{"type":"object","properties":{"title":{"type":"string"}}}'></textarea>
+          </div>
+          <button class="btn btn-primary" id="extract-btn" onclick="doExtract()">Extract JSON</button>
+        </div>
+        <div id="extract-result"></div>
+      </div>
+
+      <!-- Batch Scrape -->
+      <button class="advanced-toggle" onclick="toggleSection(this, 'batch-content')">
+        <span class="arrow">▶</span> Batch Scrape — scrape multiple URLs at once
+      </button>
+      <div id="batch-content" class="advanced-content">
+        <div class="card">
+          <div class="form-row">
+            <label>URLs (one per line)</label>
+            <textarea id="batch-urls" rows="6" placeholder="https://example.com&#10;https://another.com"></textarea>
+          </div>
+          <div class="form-row">
+            <label>Formats</label>
+            <div class="checkbox-row" id="batch-formats">
+              <label class="checkbox-item"><input type="checkbox" value="markdown" checked /> Markdown</label>
+              <label class="checkbox-item"><input type="checkbox" value="html" /> HTML</label>
+              <label class="checkbox-item"><input type="checkbox" value="links" /> Links</label>
+            </div>
+          </div>
+          <button class="btn btn-primary" id="batch-btn" onclick="doBatch()">Batch Scrape</button>
+        </div>
+        <div id="batch-result"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // ── Tab switching ──
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById(tab.dataset.tab).classList.add('active');
+      });
+    });
+
+    function toggleSection(btn, id) {
+      btn.classList.toggle('open');
+      document.getElementById(id).classList.toggle('open');
+    }
+
+    // ── Actions builder ──
+    function addAction() {
+      const list = document.getElementById('actions-list');
+      const row = document.createElement('div');
+      row.className = 'action-row';
+      row.innerHTML = `
+        <select onchange="updateActionFields(this)">
+          <option value="wait">wait</option>
+          <option value="click">click</option>
+          <option value="write">write</option>
+          <option value="press">press</option>
+          <option value="screenshot">screenshot</option>
+        </select>
+        <input type="text" class="action-value" placeholder="milliseconds (e.g. 1000)" />
+        <button class="remove-action" onclick="this.parentElement.remove()">&times;</button>
+      `;
+      list.appendChild(row);
+    }
+
+    function updateActionFields(sel) {
+      const input = sel.parentElement.querySelector('.action-value');
+      const hints = { wait:'milliseconds', click:'CSS selector', write:'text to type', press:'key name', screenshot:'(no value)' };
+      input.placeholder = hints[sel.value] || '';
+    }
+
+    function getActions() {
+      const rows = document.querySelectorAll('#actions-list .action-row');
+      if (!rows.length) return null;
+      const actions = [];
+      rows.forEach(row => {
+        const type = row.querySelector('select').value;
+        const val  = row.querySelector('.action-value').value.trim();
+        const action = { type };
+        if (type === 'wait') action.milliseconds = parseInt(val) || 1000;
+        else if (type === 'click') action.selector = val;
+        else if (type === 'write') action.text = val;
+        else if (type === 'press') action.key = val;
+        else if (type === 'screenshot') action.full_page = true;
+        actions.push(action);
+      });
+      return actions;
+    }
+
+    function getChecked(container) {
+      const boxes = (typeof container === 'string'
+        ? document.querySelectorAll(`#${container} input[type="checkbox"]:checked`)
+        : container.querySelectorAll('input[type="checkbox"]:checked'));
+      return Array.from(boxes).map(cb => cb.value);
+    }
+
+    function setLoading(btnId, loading, text) {
+      const btn = document.getElementById(btnId);
+      if (loading) {
+        btn.disabled = true;
+        btn._text = btn.innerHTML;
+        btn.innerHTML = `<span class="spinner"></span> ${text || 'Working...'}`;
+      } else {
+        btn.disabled = false;
+        btn.innerHTML = btn._text;
+      }
+    }
+
+    function showError(containerId, msg) {
+      document.getElementById(containerId).innerHTML = `
+        <div class="result-area">
+          <div class="result-header"><span class="status err">Error</span></div>
+          <div class="result-body"><pre>${escapeHtml(msg)}</pre></div>
+        </div>`;
+    }
+
+    function showResult(containerId, data, error) {
+      if (error) { showError(containerId, error); return; }
+      const result = data.data || data;
+      const keys = Object.keys(result).filter(k => k !== 'metadata' && k !== 'actions' && result[k] != null);
+      const meta = result.metadata;
+      let tabsHtml = '', panesHtml = '';
+      keys.forEach((key, i) => {
+        const active = i === 0 ? 'active' : '';
+        tabsHtml += `<button class="result-tab ${active}" onclick="switchResultTab(this,'${containerId}')" data-pane="${key}">${key}</button>`;
+        let content = result[key];
+        if (typeof content === 'object') content = JSON.stringify(content, null, 2);
+        panesHtml += `<div class="result-pane ${active}" data-pane="${key}"><pre>${escapeHtml(String(content||'(empty)'))}</pre></div>`;
+      });
+      if (meta) {
+        tabsHtml += `<button class="result-tab" onclick="switchResultTab(this,'${containerId}')" data-pane="metadata">metadata</button>`;
+        panesHtml += `<div class="result-pane" data-pane="metadata"><pre>${escapeHtml(JSON.stringify(meta,null,2))}</pre></div>`;
+      }
+      tabsHtml += `<button class="result-tab" onclick="switchResultTab(this,'${containerId}')" data-pane="raw">raw JSON</button>`;
+      panesHtml += `<div class="result-pane" data-pane="raw"><pre>${escapeHtml(JSON.stringify(data,null,2))}</pre></div>`;
+      document.getElementById(containerId).innerHTML = `
+        <div class="result-area">
+          <div class="result-header">
+            <span class="status ok">Success</span>
+            <span style="color:var(--text2);font-size:12px">${data.timestamp||''}</span>
+          </div>
+          <div class="result-tabs">${tabsHtml}</div>
+          <div class="result-body">${panesHtml}</div>
+        </div>`;
+    }
+
+    function switchResultTab(btn, containerId) {
+      const area = document.getElementById(containerId).querySelector('.result-area');
+      area.querySelectorAll('.result-tab').forEach(t => t.classList.remove('active'));
+      area.querySelectorAll('.result-pane').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      area.querySelector(`.result-pane[data-pane="${btn.dataset.pane}"]`).classList.add('active');
+    }
+
+    function escapeHtml(s) {
+      const d = document.createElement('div'); d.textContent = s; return d.innerHTML;
+    }
+
+    async function post(url, body) {
+      const res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+      return res.json();
+    }
+
+    function isLight(hex) {
+      hex = hex.replace('#','');
+      if (hex.length===3) hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
+      const r=parseInt(hex.substr(0,2),16), g=parseInt(hex.substr(2,2),16), b=parseInt(hex.substr(4,2),16);
+      return (r*299+g*587+b*114)/1000 > 150;
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // BRAND DISCOVERY
+    // ─────────────────────────────────────────────────────────
+    let _brandData = null;
+
+    async function doDiscover() {
+      const url = document.getElementById('discover-url').value.trim();
+      if (!url) return alert('Enter a brand URL');
+      const statusEl = document.getElementById('discover-status');
+      statusEl.textContent = 'Scraping brand identity...';
+      setLoading('discover-btn', true, 'Discovering...');
+      try {
+        const data = await post('/api/brand', { url });
+        statusEl.textContent = '';
+        if (data.error) { showError('discover-result', data.error); return; }
+        _brandData = data.data || data;
+        renderBrandAssets(document.getElementById('discover-result'), _brandData, url, data.timestamp);
+      } catch(e) {
+        statusEl.textContent = '';
+        showError('discover-result', e.message);
+      }
+      setLoading('discover-btn', false);
+    }
+
+    function renderBrandAssets(container, result, sourceUrl, timestamp) {
+      const b = result.branding || {};
+      const meta = result.metadata || {};
+      const colors = b.colors || {};
+      const fonts  = b.fonts  || [];
+      const typo   = b.typography || {};
+      const comps  = b.components || {};
+      const spacing = b.spacing || {};
+      const images = b.images || {};
+      const personality = b.personality || {};
+      const families = typo.font_families || typo.fontFamilies || {};
+      const sizes = typo.font_sizes || typo.fontSizes || {};
+
+      // ── Colors ──
+      let colorsHtml = '';
+      for (const [name, hex] of Object.entries(colors)) {
+        if (!hex) continue;
+        const tc = isLight(hex) ? '#000' : '#fff';
+        colorsHtml += `
+          <div class="color-swatch">
+            <div class="swatch-box" style="background:${hex}" title="${name}">
+              <span style="color:${tc};font-size:9px;font-weight:700">${hex}</span>
+              <input type="color" class="swatch-input" value="${hex}" data-cn="${name}" onchange="updateColor(this)" />
+            </div>
+            <div class="swatch-name">${name}</div>
+          </div>`;
+      }
+
+      // ── Fonts ──
+      let fontsHtml = '';
+      const addFont = (role, family) => {
+        if (!family) return;
+        fontsHtml += `<div class="font-card">
+          <div class="font-role">${role}</div>
+          <div class="font-name" style="font-family:'${family}',sans-serif">${family}</div>
+          <div class="font-sample" style="font-family:'${family}',sans-serif">The quick brown fox jumps over the lazy dog</div>
+        </div>`;
+      };
+      if (families.primary) addFont('Primary', families.primary);
+      if (families.heading && families.heading !== families.primary) addFont('Heading', families.heading);
+      if (families.code) addFont('Code', families.code);
+      if (!fontsHtml && fonts.length) fonts.forEach(f => addFont(f.role||'Font', f.family));
+
+      // ── Type scale ──
+      let scaleHtml = '';
+      for (const [name, size] of Object.entries(sizes)) {
+        scaleHtml += `<div style="display:flex;align-items:baseline;gap:12px;margin-bottom:8px">
+          <span style="font-size:${size};font-weight:600;color:var(--text)">${name}</span>
+          <span style="font-size:11px;color:var(--text2)">${size}</span>
+        </div>`;
+      }
+
+      // ── Components ──
+      let compsHtml = '';
+      for (const [name, style] of Object.entries(comps)) {
+        if (!style) continue;
+        const bg = style.background||'transparent';
+        const tc = style.text_color||style.textColor||'#fff';
+        const br = style.border_radius||style.borderRadius||'4px';
+        const border = style.border_color||style.borderColor;
+        compsHtml += `<div class="comp-item">
+          <div style="padding:8px 16px;background:${bg};color:${tc};border-radius:${br};${border?`border:1px solid ${border};`:''}font-size:13px;font-weight:500;min-width:100px;text-align:center">
+            ${name.replace(/([A-Z])/g,' $1').trim()}
+          </div>
+          <div class="comp-label">${bg}</div>
+        </div>`;
+      }
+
+      // ── Spacing ──
+      let spacingHtml = '';
+      for (const [k, v] of Object.entries(spacing)) {
+        if (v==null) continue;
+        spacingHtml += `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">
+          <span style="font-size:12px;color:var(--text2)">${k}</span>
+          <span style="font-size:12px;font-weight:600">${typeof v==='number'?v+'px':v}</span>
+        </div>`;
+      }
+
+      // ── Images ──
+      const imgCard = (label, url) => url ? `<div style="display:flex;flex-direction:column;gap:6px;align-items:center">
+        <img src="${url}" alt="${label}" style="max-height:48px;max-width:120px;padding:6px;background:#fff;border-radius:6px" onerror="this.style.display='none'" />
+        <span style="font-size:10px;color:var(--text2)">${label}</span>
+      </div>` : '';
+
+      let imagesHtml = imgCard('Logo', b.logo) + imgCard('Logo', images.logo) + imgCard('Favicon', images.favicon || images.favicon_url) + imgCard('OG Image', images.og_image || images.ogImage);
+
+      // ── Personality ──
+      let personalityHtml = '';
+      for (const [k, v] of Object.entries(personality)) {
+        if (!v) continue;
+        personalityHtml += `<span class="tag">${k}: ${v}</span>`;
+      }
+
+      // ── Screenshot ──
+      const screenshot = result.screenshot;
+      const screenshotHtml = screenshot ? `
+        <div class="brand-section" style="grid-column:1/-1">
+          <div class="brand-section-title">Page Screenshot</div>
+          <div style="border-radius:6px;overflow:hidden;max-height:300px">
+            <img src="${screenshot}" style="width:100%;display:block" />
+          </div>
+        </div>` : '';
+
+      const title = meta.title || meta.og_title || sourceUrl;
+      const colorScheme = b.color_scheme || b.colorScheme || '';
+
+      container.innerHTML = `
+        <div class="result-area">
+          <div class="result-header">
+            <div>
+              <span class="status ok">Brand Profile Extracted</span>
+              ${colorScheme ? `<span style="margin-left:10px;font-size:12px;color:var(--text2)">Color scheme: <strong>${colorScheme}</strong></span>` : ''}
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <button class="btn btn-secondary" onclick="downloadBrandJSON()" style="padding:6px 12px;font-size:12px">Download JSON</button>
+              <button class="btn btn-primary" onclick="useForReport()" style="padding:6px 14px;font-size:12px">Use for Report →</button>
+            </div>
+          </div>
+          <div class="result-body" style="max-height:none;padding:20px">
+            <h2 style="font-size:16px;margin-bottom:16px;color:var(--text)">${escapeHtml(title)}</h2>
+
+            <div class="brand-grid">
+              ${screenshotHtml}
+
+              ${colorsHtml ? `<div class="brand-section" style="grid-column:1/-1">
+                <div class="brand-section-title">Color Palette — click any swatch to correct</div>
+                <div class="color-grid">${colorsHtml}</div>
+              </div>` : ''}
+
+              ${fontsHtml ? `<div class="brand-section">
+                <div class="brand-section-title">Typography</div>
+                ${fontsHtml}
+              </div>` : ''}
+
+              ${scaleHtml ? `<div class="brand-section">
+                <div class="brand-section-title">Type Scale</div>
+                ${scaleHtml}
+              </div>` : ''}
+
+              ${compsHtml ? `<div class="brand-section" style="grid-column:1/-1">
+                <div class="brand-section-title">UI Components</div>
+                <div class="comp-grid">${compsHtml}</div>
+              </div>` : ''}
+
+              ${spacingHtml ? `<div class="brand-section">
+                <div class="brand-section-title">Spacing &amp; Radius</div>
+                ${spacingHtml}
+              </div>` : ''}
+
+              ${imagesHtml.trim() ? `<div class="brand-section">
+                <div class="brand-section-title">Brand Assets</div>
+                <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:center">${imagesHtml}</div>
+              </div>` : ''}
+
+              ${personalityHtml ? `<div class="brand-section" style="grid-column:1/-1">
+                <div class="brand-section-title">Brand Personality</div>
+                <div class="tag-list">${personalityHtml}</div>
+              </div>` : ''}
+            </div>
+
+            <details style="margin-top:8px">
+              <summary style="cursor:pointer;font-size:12px;color:var(--text2)">View raw JSON</summary>
+              <pre style="margin-top:8px;font-size:11px">${escapeHtml(JSON.stringify(result,null,2))}</pre>
+            </details>
+          </div>
+        </div>`;
+    }
+
+    function updateColor(input) {
+      const name = input.dataset.cn;
+      const hex  = input.value.toUpperCase();
+      const box  = input.closest('.color-swatch').querySelector('.swatch-box');
+      box.style.background = hex;
+      box.querySelector('span').textContent = hex;
+      box.querySelector('span').style.color = isLight(hex) ? '#000' : '#fff';
+      if (_brandData?.branding?.colors) _brandData.branding.colors[name] = hex;
+    }
+
+    function downloadBrandJSON() {
+      if (!_brandData) return;
+      const blob = new Blob([JSON.stringify(_brandData.branding, null, 2)], { type:'application/json' });
+      const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download:'brand-profile.json' });
+      a.click();
+    }
+
+    function useForReport() {
+      const url = document.getElementById('discover-url').value.trim();
+      document.getElementById('report-url').value = url;
+      // Switch to report tab
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      document.querySelector('.tab[data-tab="report"]').classList.add('active');
+      document.getElementById('report').classList.add('active');
+      document.getElementById('report-describe').focus();
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // TOPIC SUGGESTION SYSTEM
+    // ─────────────────────────────────────────────────────────
+    let _selectedTopicId = null;
+
+    async function fetchTopics() {
+      const url = document.getElementById('report-url').value.trim();
+      if (!url) return alert('Enter a company URL first');
+      const btn = document.getElementById('suggest-btn');
+      btn.classList.add('loading');
+      btn.textContent = '⏳ Loading...';
+      try {
+        const data = await post('/api/suggest-topics', { url, company: _extractCompany(url) });
+        if (data.error) { alert('Could not load topics: ' + data.error); return; }
+        renderTopics(data);
+        document.getElementById('topic-section').style.display = '';
+      } catch(e) { alert('Topic fetch failed: ' + e.message); }
+      btn.classList.remove('loading');
+      btn.textContent = '✨ Suggest Topics';
+    }
+
+    function _extractCompany(url) {
+      try {
+        let host = new URL(url.startsWith('http') ? url : 'https://'+url).hostname;
+        host = host.replace(/^www\./, '');
+        return host.split('.')[0].replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+      } catch { return 'this company'; }
+    }
+
+    function renderTopics(data) {
+      const genericEl = document.getElementById('generic-chips');
+      const brandEl   = document.getElementById('brand-chips');
+      const brandCont = document.getElementById('brand-topics-container');
+
+      genericEl.innerHTML = '';
+      brandEl.innerHTML = '';
+
+      const allTopics = [...(data.generic_topics||[]), ...(data.brand_topics||[])];
+
+      function makeChip(t) {
+        const chip = document.createElement('button');
+        chip.className = 'topic-chip';
+        chip.dataset.id  = t.id;
+        chip.dataset.desc = t.desc || t.label;
+        chip.innerHTML = `<span class="chip-icon">${t.icon||'📄'}</span>${escapeHtml(t.label)}`;
+        chip.addEventListener('click', () => selectTopic(chip, t));
+        return chip;
+      }
+
+      (data.generic_topics||[]).forEach(t => genericEl.appendChild(makeChip(t)));
+
+      if ((data.brand_topics||[]).length > 0) {
+        (data.brand_topics||[]).forEach(t => brandEl.appendChild(makeChip(t)));
+        brandCont.style.display = '';
+      } else {
+        brandCont.style.display = 'none';
+      }
+    }
+
+    function selectTopic(chipEl, topic) {
+      // Deselect all
+      document.querySelectorAll('.topic-chip').forEach(c => c.classList.remove('selected'));
+      chipEl.classList.add('selected');
+      _selectedTopicId = topic.id;
+      // Populate describe field
+      document.getElementById('report-describe').value = topic.desc || topic.label;
+      // Auto-focus
+      document.getElementById('report-describe').focus();
+    }
+
+    async function enhanceTopic() {
+      const topic   = document.getElementById('report-describe').value.trim();
+      if (!topic) return alert('Write or select a topic first');
+      const url     = document.getElementById('report-url').value.trim();
+      const company = _extractCompany(url);
+      const btn     = document.getElementById('enhance-btn');
+      btn.classList.add('loading');
+      btn.textContent = '⏳';
+      try {
+        const data = await post('/api/enhance-topic', { topic, company, url });
+        if (data.enhanced) {
+          document.getElementById('report-describe').value = data.enhanced;
+        }
+      } catch(e) { alert('Enhance failed: ' + e.message); }
+      btn.classList.remove('loading');
+      btn.textContent = '💡 AI Enhance';
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // REPORT GENERATOR
+    // ─────────────────────────────────────────────────────────
+    async function doReport() {
+      const url = document.getElementById('report-url').value.trim();
+      if (!url) return alert('Enter a company URL');
+      const describe = document.getElementById('report-describe').value.trim();
+      if (!describe) return alert('Describe what the report should cover');
+
+      const body = {
+        url,
+        describe,
+        title: document.getElementById('report-title').value.trim(),
+      };
+
+      // Update step indicators
+      setStep(2); setStep(3);
+
+      const statusEl = document.getElementById('report-status');
+      setLoading('report-btn', true, 'Generating...');
+
+      // Show progress
+      document.getElementById('report-result').innerHTML = `
+        <div class="progress-msg">
+          <span class="spinner" style="border-top-color:var(--accent)"></span>
+          Scraping brand identity from ${escapeHtml(url)}... then generating report with AI...
+        </div>`;
+
+      try {
+        statusEl.textContent = '';
+        const data = await post('/api/report', body);
+
+        if (data.error) {
+          setStep(1);
+          document.getElementById('report-result').innerHTML = '';
+          showError('report-result', data.error);
+        } else {
+          setStep(4);
+          renderReport(data);
+        }
+      } catch(e) {
+        setStep(1);
+        document.getElementById('report-result').innerHTML = '';
+        showError('report-result', e.message);
+      }
+      setLoading('report-btn', false);
+    }
+
+    function setStep(n) {
+      for (let i=1; i<=4; i++) {
+        const el = document.getElementById(`step-${i}`);
+        el.classList.remove('active','done');
+        if (i < n) el.classList.add('done');
+        else if (i === n) el.classList.add('active');
+      }
+    }
+
+    function renderReport(data) {
+      const htmlContent = data.html;
+      const blob = new Blob([htmlContent], { type:'text/html' });
+      const blobUrl = URL.createObjectURL(blob);
+      window._reportHtml = htmlContent;
+      window._reportTitle = data.report_title || 'report';
+
+      document.getElementById('report-result').innerHTML = `
+        <div class="result-area">
+          <div class="report-preview-bar">
+            <div>
+              <span class="status ok">Report Ready</span>
+              <span style="margin-left:12px;font-size:12px;color:var(--text2)">${escapeHtml(data.company||'')} · ${data.sections||0} sections</span>
+            </div>
+            <div class="download-btns">
+              <button class="btn btn-secondary" onclick="downloadReportHTML()" style="padding:7px 14px;font-size:13px">⬇ Download HTML</button>
+              <button class="btn btn-secondary" onclick="printReport()" style="padding:7px 14px;font-size:13px">🖨 Print / Save PDF</button>
+              <button class="btn btn-primary" onclick="window.open('${blobUrl}','_blank')" style="padding:7px 14px;font-size:13px">Open Full Page ↗</button>
+            </div>
+          </div>
+          <div style="border-top:1px solid var(--border)">
+            <iframe id="report-iframe" style="width:100%;height:720px;border:none;background:#e8e8e8;display:block"></iframe>
+          </div>
+          <div style="padding:10px 16px;font-size:11px;color:var(--text2);border-top:1px solid var(--border)">
+            Tip: Use "Print / Save PDF" to export as PDF — in the print dialog, choose "Save as PDF" and enable background graphics for best results.
+          </div>
+        </div>`;
+
+      const iframe = document.getElementById('report-iframe');
+      iframe.contentDocument.open();
+      iframe.contentDocument.write(htmlContent);
+      iframe.contentDocument.close();
+    }
+
+    function downloadReportHTML() {
+      if (!window._reportHtml) return;
+      const blob = new Blob([window._reportHtml], { type:'text/html' });
+      const a = Object.assign(document.createElement('a'), {
+        href: URL.createObjectURL(blob),
+        download: (window._reportTitle||'report').replace(/[^a-z0-9]+/gi,'-')+'.html'
+      });
+      a.click();
+    }
+
+    function printReport() {
+      const iframe = document.getElementById('report-iframe');
+      if (!iframe) return;
+      iframe.contentWindow.print();
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // TOOLS
+    // ─────────────────────────────────────────────────────────
+    async function doScrape() {
+      const url = document.getElementById('scrape-url').value.trim();
+      if (!url) return alert('Enter a URL');
+      const formats = getChecked(document.querySelector('#scrape-content .checkbox-row'));
+      if (!formats.length) return alert('Select at least one format');
+      const body = { url, formats };
+      const country = document.getElementById('scrape-country').value.trim();
+      const languages = document.getElementById('scrape-languages').value.trim();
+      const maxAge = document.getElementById('scrape-maxage').value.trim();
+      if (country) body.country = country;
+      if (languages) body.languages = languages;
+      if (maxAge) body.maxAge = parseInt(maxAge);
+      const actions = getActions();
+      if (actions) body.actions = actions;
+      setLoading('scrape-btn', true);
+      try {
+        const data = await post('/api/scrape', body);
+        if (data.error) showResult('scrape-result', null, data.error);
+        else showResult('scrape-result', data);
+      } catch(e) { showResult('scrape-result', null, e.message); }
+      setLoading('scrape-btn', false);
+    }
+
+    async function doExtract() {
+      const url = document.getElementById('extract-url').value.trim();
+      if (!url) return alert('Enter a URL');
+      const body = { url, prompt:document.getElementById('extract-prompt').value.trim(), schema:document.getElementById('extract-schema').value.trim() };
+      setLoading('extract-btn', true);
+      try {
+        const data = await post('/api/extract', body);
+        if (data.error) showResult('extract-result', null, data.error);
+        else showResult('extract-result', data);
+      } catch(e) { showResult('extract-result', null, e.message); }
+      setLoading('extract-btn', false);
+    }
+
+    async function doBatch() {
+      const urls = document.getElementById('batch-urls').value.trim();
+      if (!urls) return alert('Enter URLs');
+      const formats = getChecked(document.getElementById('batch-formats'));
+      setLoading('batch-btn', true);
+      try {
+        const data = await post('/api/batch', { urls, formats });
+        if (data.error) showResult('batch-result', null, data.error);
+        else showResult('batch-result', data);
+      } catch(e) { showResult('batch-result', null, e.message); }
+      setLoading('batch-btn', false);
+    }
+  </script>
+</body>
+</html>

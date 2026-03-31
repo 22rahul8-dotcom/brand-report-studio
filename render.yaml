@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: brand-report-studio
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: FIRECRAWL_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
