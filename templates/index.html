@@ -346,6 +346,62 @@
       margin-bottom: 16px;
     }
 
+    /* Progress counter */
+    .progress-wrap {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      margin-bottom: 16px;
+    }
+    .progress-top {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .progress-stage {
+      font-size: 13px; color: var(--text2);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .progress-stage .p-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--accent); animation: pulse-dot 1s ease-in-out infinite;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.7); }
+    }
+    .progress-pct {
+      font-size: 22px; font-weight: 700; color: var(--text);
+      font-variant-numeric: tabular-nums; letter-spacing: -0.5px;
+    }
+    .progress-bar-track {
+      width: 100%; height: 4px;
+      background: var(--border); border-radius: 2px; overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%; border-radius: 2px;
+      background: var(--accent);
+      transition: width 0.4s cubic-bezier(.4,0,.2,1);
+      width: 0%;
+    }
+    .progress-stages-row {
+      display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap;
+    }
+    .p-stage-pill {
+      font-size: 10px; font-weight: 600; letter-spacing: 0.06em;
+      text-transform: uppercase; padding: 3px 8px; border-radius: 20px;
+      border: 1px solid var(--border); color: var(--text2);
+      transition: all .3s;
+    }
+    .p-stage-pill.active {
+      border-color: var(--accent); color: var(--accent);
+      background: rgba(234,108,49,.08);
+    }
+    .p-stage-pill.done {
+      border-color: var(--green,#4caf50); color: var(--green,#4caf50);
+      background: rgba(76,175,80,.08);
+    }
+
     @media (max-width: 640px) { .tabs { flex-wrap: wrap; } }
 
     /* Topic suggestion system */
@@ -877,16 +933,41 @@
       const url = document.getElementById('discover-url').value.trim();
       if (!url) return alert('Enter a brand URL');
       const statusEl = document.getElementById('discover-status');
-      statusEl.textContent = 'Scraping brand identity...';
+      statusEl.textContent = '';
       setLoading('discover-btn', true, 'Discovering...');
+
+      // Progress counter for brand scraping
+      const brandStages = [
+        { id: 'fetch',   label: '🌐 Fetching page' },
+        { id: 'colors',  label: '🎨 Extracting colors' },
+        { id: 'fonts',   label: '✏️ Reading typography' },
+        { id: 'build',   label: '🏗️ Building brand profile' },
+      ];
+      startProgress('#discover-result', brandStages);
+      setProgressPct(10);
+      activateStage('fetch', '🌐 Fetching ' + _extractCompany(url) + '…');
+
+      const t1 = setTimeout(() => { setProgressPct(40); activateStage('colors', '🎨 Extracting colors & assets…'); }, 3500);
+      const t2 = setTimeout(() => { setProgressPct(70); activateStage('fonts', '✏️ Reading typography…'); }, 7000);
+      const t3 = setTimeout(() => { setProgressPct(88); activateStage('build', '🏗️ Building brand profile…'); }, 11000);
+
       try {
         const data = await post('/api/brand', { url });
-        statusEl.textContent = '';
-        if (data.error) { showError('discover-result', data.error); return; }
+        clearTimeout(t1); clearTimeout(t2); clearTimeout(t3);
+        if (data.error) {
+          clearInterval(_progressTimer);
+          document.getElementById('discover-result').innerHTML = '';
+          showError('discover-result', data.error);
+          return;
+        }
+        finishProgress();
+        await new Promise(r => setTimeout(r, 300));
         _brandData = data.data || data;
         renderBrandAssets(document.getElementById('discover-result'), _brandData, url, data.timestamp);
       } catch(e) {
-        statusEl.textContent = '';
+        clearTimeout(t1); clearTimeout(t2); clearTimeout(t3);
+        clearInterval(_progressTimer);
+        document.getElementById('discover-result').innerHTML = '';
         showError('discover-result', e.message);
       }
       setLoading('discover-btn', false);
@@ -1165,15 +1246,31 @@
       const company = _extractCompany(url);
       const btn     = document.getElementById('enhance-btn');
       btn.classList.add('loading');
-      btn.textContent = '⏳';
+      btn.innerHTML = '<span id="enhance-pct">0%</span>';
+
+      // Animate percentage in button
+      let _ep = 0;
+      const _et = setInterval(() => {
+        _ep = Math.min(_ep + 3, 90);
+        const el = document.getElementById('enhance-pct');
+        if (el) el.textContent = _ep + '%';
+      }, 120);
+
       try {
         const data = await post('/api/enhance-topic', { topic, company, url });
+        clearInterval(_et);
+        const el = document.getElementById('enhance-pct');
+        if (el) el.textContent = '100%';
+        await new Promise(r => setTimeout(r, 200));
         if (data.enhanced) {
           document.getElementById('report-describe').value = data.enhanced;
         }
-      } catch(e) { alert('Enhance failed: ' + e.message); }
+      } catch(e) {
+        clearInterval(_et);
+        alert('Enhance failed: ' + e.message);
+      }
       btn.classList.remove('loading');
-      btn.textContent = '💡 AI Enhance';
+      btn.innerHTML = '💡 AI Enhance';
     }
 
     // ─────────────────────────────────────────────────────────
@@ -1197,26 +1294,66 @@
       const statusEl = document.getElementById('report-status');
       setLoading('report-btn', true, 'Generating...');
 
-      // Show progress
-      document.getElementById('report-result').innerHTML = `
-        <div class="progress-msg">
-          <span class="spinner" style="border-top-color:var(--accent)"></span>
-          Scraping brand identity from ${escapeHtml(url)}... then generating report with AI...
-        </div>`;
+      // Show progress counter — all stages including render sub-steps
+      const reportStages = [
+        { id: 'scrape',    label: '🔍 Scraping brand' },
+        { id: 'analyse',   label: '🎨 Analysing identity' },
+        { id: 'ai',        label: '🤖 AI structuring' },
+        { id: 'css',       label: '🎨 Brand CSS' },
+        { id: 'cover',     label: '🖼 Cover art' },
+        { id: 'exec',      label: '📋 Exec summary' },
+        { id: 'kpi',       label: '📊 KPI metrics' },
+        { id: 'narrative', label: '📝 Narrative' },
+        { id: 'charts',    label: '📈 Charts' },
+        { id: 'recs',      label: '✅ Recommendations' },
+        { id: 'conclude',  label: '🏁 Conclusion' },
+        { id: 'assemble',  label: '🗂 Assembling HTML' },
+      ];
+      startProgress('#report-result', reportStages);
+
+      const company = _extractCompany(url);
+
+      // Phase 1 — Scraping (0–4s)
+      setProgressPct(8);
+      activateStage('scrape', `🔍 Scraping brand identity from ${company}…`);
+      await new Promise(r => setTimeout(r, 400));
+
+      const timers = [
+        // Phase 2 — Brand analysis (4–9s)
+        setTimeout(() => { setProgressPct(30); activateStage('analyse', '🎨 Extracting colors, fonts & visual tokens…'); }, 4000),
+        // Phase 3 — AI structuring (9–22s)
+        setTimeout(() => { setProgressPct(52); activateStage('ai', '🤖 AI writing executive summary & sections…'); }, 9000),
+        // Phase 4 — Render sub-steps (22–38s)
+        setTimeout(() => { setProgressPct(60); activateStage('css',       '🎨 Compiling brand CSS & typography tokens…'); }, 22000),
+        setTimeout(() => { setProgressPct(66); activateStage('cover',     '🖼 Generating cover art SVG…'); },               24500),
+        setTimeout(() => { setProgressPct(72); activateStage('exec',      '📋 Rendering executive summary page…'); },       26500),
+        setTimeout(() => { setProgressPct(77); activateStage('kpi',       '📊 Building KPI stat cards…'); },                28000),
+        setTimeout(() => { setProgressPct(82); activateStage('narrative', '📝 Laying out narrative sections…'); },          29500),
+        setTimeout(() => { setProgressPct(86); activateStage('charts',    '📈 Embedding slope & bar charts…'); },           31000),
+        setTimeout(() => { setProgressPct(90); activateStage('recs',      '✅ Rendering recommendations grid…'); },         32500),
+        setTimeout(() => { setProgressPct(93); activateStage('conclude',  '🏁 Writing conclusion section…'); },             34000),
+        setTimeout(() => { setProgressPct(97); activateStage('assemble',  '🗂 Assembling final HTML document…'); },         35500),
+      ];
 
       try {
         statusEl.textContent = '';
         const data = await post('/api/report', body);
+        timers.forEach(t => clearTimeout(t));
 
         if (data.error) {
+          clearInterval(_progressTimer);
           setStep(1);
           document.getElementById('report-result').innerHTML = '';
           showError('report-result', data.error);
         } else {
+          finishProgress();
+          await new Promise(r => setTimeout(r, 300));
           setStep(4);
           renderReport(data);
         }
       } catch(e) {
+        timers.forEach(t => clearTimeout(t));
+        clearInterval(_progressTimer);
         setStep(1);
         document.getElementById('report-result').innerHTML = '';
         showError('report-result', e.message);
@@ -1333,6 +1470,88 @@
         else showResult('batch-result', data);
       } catch(e) { showResult('batch-result', null, e.message); }
       setLoading('batch-btn', false);
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // PROGRESS COUNTER
+    // ─────────────────────────────────────────────────────────
+    let _progressTimer = null;
+    let _progressTarget = 0;
+    let _progressCurrent = 0;
+
+    function buildProgressHTML(stages) {
+      const pills = stages.map(s =>
+        `<span class="p-stage-pill" id="pill-${s.id}">${s.label}</span>`
+      ).join('');
+      return `
+        <div class="progress-wrap" id="progress-block">
+          <div class="progress-top">
+            <div class="progress-stage">
+              <div class="p-dot"></div>
+              <span id="progress-stage-label">Initialising…</span>
+            </div>
+            <div class="progress-pct"><span id="progress-num">0</span>%</div>
+          </div>
+          <div class="progress-bar-track">
+            <div class="progress-bar-fill" id="progress-bar"></div>
+          </div>
+          <div class="progress-stages-row">${pills}</div>
+        </div>`;
+    }
+
+    function setProgressPct(pct) {
+      _progressTarget = Math.min(pct, 99);
+    }
+
+    function _tickProgress() {
+      if (_progressCurrent < _progressTarget) {
+        _progressCurrent = Math.min(_progressCurrent + 1, _progressTarget);
+        const numEl = document.getElementById('progress-num');
+        const barEl = document.getElementById('progress-bar');
+        if (numEl) numEl.textContent = Math.round(_progressCurrent);
+        if (barEl) barEl.style.width = _progressCurrent + '%';
+      }
+    }
+
+    function startProgress(containerSelector, stages) {
+      const container = document.querySelector(containerSelector);
+      if (!container) return;
+      _progressCurrent = 0;
+      _progressTarget  = 0;
+      container.innerHTML = buildProgressHTML(stages);
+      clearInterval(_progressTimer);
+      _progressTimer = setInterval(_tickProgress, 30);
+      // Activate first stage
+      if (stages.length) activateStage(stages[0].id, stages[0].label);
+    }
+
+    function activateStage(stageId, label) {
+      // Mark previous pills done
+      document.querySelectorAll('.p-stage-pill').forEach(p => {
+        if (p.classList.contains('active')) {
+          p.classList.remove('active');
+          p.classList.add('done');
+        }
+      });
+      const pill = document.getElementById('pill-' + stageId);
+      if (pill) { pill.classList.remove('done'); pill.classList.add('active'); }
+      const lbl = document.getElementById('progress-stage-label');
+      if (lbl) lbl.textContent = label;
+    }
+
+    function finishProgress() {
+      clearInterval(_progressTimer);
+      _progressTarget  = 100;
+      _progressCurrent = 100;
+      const numEl = document.getElementById('progress-num');
+      const barEl = document.getElementById('progress-bar');
+      if (numEl) numEl.textContent = '100';
+      if (barEl) barEl.style.width = '100%';
+      document.querySelectorAll('.p-stage-pill').forEach(p => {
+        p.classList.remove('active'); p.classList.add('done');
+      });
+      const lbl = document.getElementById('progress-stage-label');
+      if (lbl) lbl.textContent = 'Done!';
     }
   </script>
 </body>

@@ -286,13 +286,28 @@ Company: {company}
 Brief: {topic}
 
 Return ONLY the enhanced description. No preamble, no quotes."""
-            response = client.chat.completions.create(
-                model="meta-llama/llama-3.3-70b-instruct:free",
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=120,
-                temperature=0.4,
-            )
-            enhanced = response.choices[0].message.content.strip().strip('"').strip("'")
+            _enhance_models = [
+                "google/gemma-3-27b-it:free",
+                "nousresearch/hermes-3-llama-3.1-405b:free",
+                "nvidia/nemotron-3-super-120b-a12b:free",
+            ]
+            enhanced = None
+            for _m in _enhance_models:
+                try:
+                    _r = client.chat.completions.create(
+                        model=_m,
+                        messages=[{"role": "user", "content": prompt}],
+                        max_tokens=120,
+                        temperature=0.4,
+                    )
+                    _txt = _r.choices[0].message.content.strip().strip('"').strip("'") if _r.choices else ""
+                    if _txt and "rate-limited" not in _txt.lower():
+                        enhanced = _txt
+                        break
+                except Exception:
+                    continue
+            if not enhanced:
+                enhanced = topic  # fallback to original if all models failed
         else:
             # Rule-based enhancement without LLM
             expansions = {
@@ -480,12 +495,34 @@ Return ONLY valid JSON (no markdown, no backticks) with EXACTLY this structure:
 SCRAPED CONTENT TO USE:
 {clean_md[:8000]}"""
 
-    response = client.chat.completions.create(
-        model="meta-llama/llama-3.3-70b-instruct:free",
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=4096,
-        temperature=0.3,
-    )
+    # Try models in order until one works (free tier may be rate-limited)
+    _or_models = [
+        "google/gemma-3-27b-it:free",
+        "nousresearch/hermes-3-llama-3.1-405b:free",
+        "nvidia/nemotron-3-super-120b-a12b:free",
+    ]
+    response = None
+    last_err = None
+    for _model in _or_models:
+        try:
+            _resp = client.chat.completions.create(
+                model=_model,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=4096,
+                temperature=0.3,
+            )
+            # Check for upstream rate-limit passed through as a response
+            _content = _resp.choices[0].message.content if _resp.choices else ""
+            if not _content or "rate-limited" in _content.lower() or "temporarily" in _content.lower():
+                last_err = Exception(f"Model {_model} returned empty/rate-limit response")
+                continue
+            response = _resp
+            break
+        except Exception as _e:
+            last_err = _e
+            continue
+    if response is None:
+        raise last_err
     raw = response.choices[0].message.content
 
     match = re.search(r"```(?:json)?\s*([\s\S]+?)\s*```", raw)
