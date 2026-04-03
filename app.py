@@ -261,6 +261,25 @@ def api_suggest_topics():
         return jsonify({"error": str(e)}), 500
 
 
+def _get_llm_client():
+    """Return (openai_client, models_list) for whichever LLM key is configured.
+    Prefers GROQ_API_KEY, falls back to OPENROUTER_API_KEY. Returns (None, []) if neither set."""
+    from openai import OpenAI as OpenAIClient
+    groq_key = os.environ.get("GROQ_API_KEY")
+    if groq_key:
+        return (
+            OpenAIClient(api_key=groq_key, base_url="https://api.groq.com/openai/v1"),
+            ["llama-3.3-70b-versatile"],
+        )
+    or_key = os.environ.get("OPENROUTER_API_KEY")
+    if or_key:
+        return (
+            OpenAIClient(api_key=or_key, base_url="https://openrouter.ai/api/v1"),
+            ["google/gemma-3-27b-it:free", "nousresearch/hermes-3-llama-3.1-405b:free", "nvidia/nemotron-3-super-120b-a12b:free"],
+        )
+    return None, []
+
+
 @app.route("/api/enhance-topic", methods=["POST"])
 def api_enhance_topic():
     """Enhance/expand a report description using Groq LLM."""
@@ -273,28 +292,18 @@ def api_enhance_topic():
         if not topic:
             return jsonify({"error": "Topic is required"}), 400
 
-        or_key = os.environ.get("OPENROUTER_API_KEY")
-        if or_key:
-            from openai import OpenAI as OpenAIClient
-            client = OpenAIClient(
-                api_key=or_key,
-                base_url="https://openrouter.ai/api/v1",
-            )
+        llm_client, _enhance_models = _get_llm_client()
+        if llm_client:
             prompt = f"""You are a business analyst. Expand this report brief into a detailed, specific report description (2-3 sentences, max 60 words).
 
 Company: {company}
 Brief: {topic}
 
 Return ONLY the enhanced description. No preamble, no quotes."""
-            _enhance_models = [
-                "google/gemma-3-27b-it:free",
-                "nousresearch/hermes-3-llama-3.1-405b:free",
-                "nvidia/nemotron-3-super-120b-a12b:free",
-            ]
             enhanced = None
             for _m in _enhance_models:
                 try:
-                    _r = client.chat.completions.create(
+                    _r = llm_client.chat.completions.create(
                         model=_m,
                         messages=[{"role": "user", "content": prompt}],
                         max_tokens=120,
@@ -368,15 +377,10 @@ def api_report():
         company = brand.get("company", slug.title())
         report_title = title or f"{company} — Company Overview"
 
-        # Phase 3: Structure content with OpenRouter (free tier)
-        or_key = os.environ.get("OPENROUTER_API_KEY")
-        if or_key and markdown:
-            from openai import OpenAI as OpenAIClient
-            or_client = OpenAIClient(
-                api_key=or_key,
-                base_url="https://openrouter.ai/api/v1",
-            )
-            structured = _structure_with_groq(or_client, markdown, company, report_title, data.get("describe", ""))
+        # Phase 3: Structure content with Groq or OpenRouter
+        llm_client, llm_models = _get_llm_client()
+        if llm_client and markdown:
+            structured = _structure_with_groq(llm_client, markdown, company, report_title, data.get("describe", ""), models=llm_models)
         else:
             structured = _auto_structure(markdown, company, report_title, data.get("describe", ""))
 
@@ -401,8 +405,8 @@ def api_report():
         return jsonify({"error": str(e)}), 500
 
 
-def _structure_with_groq(client, markdown: str, company: str, title: str, describe: str = "") -> dict:
-    """Use OpenRouter (Llama) to structure scraped content into magazine sections."""
+def _structure_with_groq(client, markdown: str, company: str, title: str, describe: str = "", models: list = None) -> dict:
+    """Use Groq or OpenRouter to structure scraped content into magazine sections."""
     import re, json as _json
 
     # Clean the markdown before sending to LLM
@@ -496,7 +500,7 @@ SCRAPED CONTENT TO USE:
 {clean_md[:8000]}"""
 
     # Try models in order until one works (free tier may be rate-limited)
-    _or_models = [
+    _or_models = models or [
         "google/gemma-3-27b-it:free",
         "nousresearch/hermes-3-llama-3.1-405b:free",
         "nvidia/nemotron-3-super-120b-a12b:free",
