@@ -404,7 +404,155 @@
 
     @media (max-width: 640px) { .tabs { flex-wrap: wrap; } }
 
-    /* Topic suggestion system */
+    /* ── Full-screen Generation Overlay ── */
+    #gen-overlay {
+      display: none;
+      position: fixed; inset: 0; z-index: 9999;
+      background: rgba(10,10,15,.97);
+      backdrop-filter: blur(12px);
+      flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 40px 20px;
+    }
+    #gen-overlay.visible { display: flex; }
+
+    .gen-overlay-inner {
+      width: 100%; max-width: 540px;
+      display: flex; flex-direction: column; align-items: center; gap: 0;
+    }
+
+    .gen-logo-ring {
+      width: 72px; height: 72px; border-radius: 50%;
+      background: radial-gradient(circle at 40% 35%, #f97316 0%, #c2410c 100%);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 32px;
+      box-shadow: 0 0 0 12px rgba(249,115,22,.1), 0 0 0 24px rgba(249,115,22,.05);
+      margin-bottom: 24px;
+      animation: ringPulse 2.4s ease-in-out infinite;
+    }
+    @keyframes ringPulse {
+      0%,100% { box-shadow: 0 0 0 12px rgba(249,115,22,.1), 0 0 0 24px rgba(249,115,22,.05); }
+      50%      { box-shadow: 0 0 0 16px rgba(249,115,22,.15), 0 0 0 32px rgba(249,115,22,.07); }
+    }
+
+    .gen-company { font-size: 22px; font-weight: 800; color: var(--text); letter-spacing: -0.5px; margin-bottom: 6px; text-align: center; }
+    .gen-topic   { font-size: 13px; color: var(--text2); margin-bottom: 32px; text-align: center; max-width: 380px; line-height: 1.5; }
+
+    .gen-stages {
+      width: 100%; display: flex; flex-direction: column; gap: 0;
+      margin-bottom: 28px;
+    }
+    .gen-stage {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 14px; border-radius: 10px;
+      transition: all .3s;
+      opacity: .35;
+    }
+    .gen-stage.gs-active {
+      background: rgba(249,115,22,.08);
+      border: 1px solid rgba(249,115,22,.2);
+      opacity: 1;
+    }
+    .gen-stage.gs-done {
+      opacity: .55;
+    }
+    .gen-stage-icon {
+      width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px;
+      background: var(--surface2); border: 1px solid var(--border);
+      transition: all .3s;
+    }
+    .gen-stage.gs-active .gen-stage-icon {
+      background: rgba(249,115,22,.15);
+      border-color: rgba(249,115,22,.4);
+      animation: iconSpin 1.5s ease-in-out infinite;
+    }
+    .gen-stage.gs-done .gen-stage-icon {
+      background: rgba(34,197,94,.12);
+      border-color: rgba(34,197,94,.3);
+      animation: none;
+      font-size: 15px;
+    }
+    @keyframes iconSpin {
+      0%,100% { transform: scale(1);   }
+      50%      { transform: scale(1.15); }
+    }
+    .gen-stage-text { flex: 1; }
+    .gen-stage-label { font-size: 13px; font-weight: 600; color: var(--text); }
+    .gen-stage-sub   { font-size: 11px; color: var(--text2); margin-top: 1px; }
+    .gen-stage.gs-active .gen-stage-label { color: var(--accent); }
+
+    .gen-progress-track {
+      width: 100%; height: 3px;
+      background: var(--border); border-radius: 2px; overflow: hidden;
+      margin-bottom: 10px;
+    }
+    .gen-progress-fill {
+      height: 100%; border-radius: 2px;
+      background: linear-gradient(90deg, #f97316 0%, #fb923c 100%);
+      transition: width .4s cubic-bezier(.4,0,.2,1);
+      width: 0%;
+    }
+    .gen-pct { font-size: 12px; color: var(--text2); text-align: right; margin-bottom: 24px; width: 100%; }
+
+    .gen-cancel {
+      padding: 9px 24px; border-radius: 8px;
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text2); font-size: 13px; cursor: pointer;
+      transition: all .15s;
+    }
+    .gen-cancel:hover { border-color: var(--red); color: var(--red); }
+
+    /* ── History Tab ── */
+    .history-empty {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 60px 20px; text-align: center; gap: 12px;
+    }
+    .history-empty-icon { font-size: 48px; opacity: .3; }
+    .history-empty h3 { font-size: 16px; font-weight: 600; color: var(--text2); }
+    .history-empty p  { font-size: 13px; color: var(--text2); max-width: 320px; line-height: 1.6; }
+
+    .history-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px; margin-top: 4px;
+    }
+    .history-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      cursor: pointer;
+      transition: all .2s;
+    }
+    .history-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .history-card-thumb {
+      height: 120px; background: var(--surface2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 36px; border-bottom: 1px solid var(--border);
+      position: relative; overflow: hidden;
+    }
+    .history-card-thumb iframe {
+      width: 200%; height: 200%; transform: scale(.5) translate(-50%,-50%);
+      transform-origin: top left; border: none; pointer-events: none;
+      position: absolute; top: 0; left: 0;
+    }
+    .history-card-body { padding: 14px 16px; }
+    .history-card-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .history-card-meta  { font-size: 12px; color: var(--text2); display: flex; gap: 10px; flex-wrap: wrap; }
+    .history-card-actions {
+      display: flex; gap: 8px; padding: 10px 14px 14px;
+    }
+    .history-card-actions button { flex: 1; padding: 7px 0; font-size: 12px; font-weight: 600; }
+
+    .history-toolbar {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .history-toolbar h2 { font-size: 15px; font-weight: 700; color: var(--text); }
+    .history-toolbar button { padding: 7px 14px; font-size: 12px; }
+
+    /* ── Topic suggestion system */
     .topic-section { margin-bottom: 20px; }
     .topic-section-label {
       font-size: 10px; font-weight: 700; letter-spacing: 0.12em;
@@ -539,9 +687,62 @@
     .guide-full { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 14px; }
     .guide-full p { font-size: 13px; color: var(--text2); line-height: 1.6; margin-bottom: 10px; }
     .guide-full p:last-child { margin-bottom: 0; }
+
+    /* ── Mobile Responsive ── */
+    @media (max-width: 640px) {
+      .app { padding: 16px 14px; }
+      header h1 { font-size: 18px; }
+      header .tagline { display: none; }
+      .card { padding: 16px; }
+      .steps { flex-direction: column; gap: 0; }
+      .step { border-right: none; border-bottom: 1px solid var(--border); }
+      .step:last-child { border-bottom: none; }
+      .report-preview-bar { flex-direction: column; align-items: flex-start; gap: 10px; }
+      .download-btns { flex-wrap: wrap; }
+      #report-result iframe { height: 480px; }
+      /* overlay tweaks */
+      .gen-stages { gap: 2px; }
+      .gen-stage { padding: 8px 10px; }
+      .gen-company { font-size: 18px; }
+      /* history grid */
+      .history-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 480px) {
+      .tabs .tab { font-size: 12px; padding: 8px 8px; }
+      .welcome { flex-direction: column; gap: 10px; }
+      .welcome-steps { flex-direction: column; }
+      .welcome-step .ws-arrow { display: none; }
+      /* 2-col form becomes 1-col */
+      .card [style*="grid-template-columns:1fr 1fr"] {
+        display: flex !important; flex-direction: column; gap: 12px;
+      }
+    }
   </style>
 </head>
 <body>
+
+  <!-- ═══════════════════════════════════════════════════
+       FULL-SCREEN GENERATION OVERLAY
+  ════════════════════════════════════════════════════ -->
+  <div id="gen-overlay">
+    <div class="gen-overlay-inner">
+      <div class="gen-logo-ring">&#128293;</div>
+      <div class="gen-company" id="gen-company-name">Brand Report Studio</div>
+      <div class="gen-topic"   id="gen-topic-label">Generating your report…</div>
+
+      <div class="gen-stages" id="gen-stages-list">
+        <!-- populated by JS -->
+      </div>
+
+      <div class="gen-progress-track">
+        <div class="gen-progress-fill" id="gen-prog-fill"></div>
+      </div>
+      <div class="gen-pct"><span id="gen-prog-pct">0</span>% complete</div>
+
+      <button class="gen-cancel" onclick="cancelGeneration()">Cancel</button>
+    </div>
+  </div>
+
   <div class="app">
     <header>
       <div class="logo">&#128293;</div>
@@ -571,6 +772,7 @@
     <div class="tabs">
       <button class="tab active" data-tab="discover">&#127752; Brand Discovery</button>
       <button class="tab" data-tab="report">&#128196; Report Generator</button>
+      <button class="tab" data-tab="history">&#128203; History</button>
       <button class="tab" data-tab="tools">&#128295; Tools</button>
     </div>
 
@@ -681,7 +883,18 @@
     </div>
 
     <!-- ═══════════════════════════════════════════════════
-         TAB 3: TOOLS (Scrape, Extract JSON, Batch)
+         TAB 3: HISTORY
+    ════════════════════════════════════════════════════ -->
+    <div id="history" class="panel">
+      <div class="history-toolbar">
+        <h2>&#128203; Generated Reports</h2>
+        <button class="btn btn-secondary" onclick="clearHistory()" style="font-size:12px;padding:7px 14px">Clear All</button>
+      </div>
+      <div id="history-grid"></div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════
+         TAB 4: TOOLS (Scrape, Extract JSON, Batch)
     ════════════════════════════════════════════════════ -->
     <div id="tools" class="panel">
       <div class="hint-box">
@@ -791,7 +1004,9 @@
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
         tab.classList.add('active');
-        document.getElementById(tab.dataset.tab).classList.add('active');
+        const panelId = tab.dataset.tab;
+        document.getElementById(panelId).classList.add('active');
+        if (panelId === 'history') renderHistory();
       });
     });
 
@@ -1274,6 +1489,100 @@
     }
 
     // ─────────────────────────────────────────────────────────
+    // FULL-SCREEN GENERATION OVERLAY
+    // ─────────────────────────────────────────────────────────
+    const GEN_STAGES_DEF = [
+      { id: 'scrape',    icon: '🌐', label: 'Scraping website',         sub: 'Fetching brand identity & page content' },
+      { id: 'analyse',   icon: '🎨', label: 'Analysing brand',          sub: 'Extracting colors, fonts & visual tokens' },
+      { id: 'ai',        icon: '🤖', label: 'AI structuring',           sub: 'Writing executive summary & section content' },
+      { id: 'layout',    icon: '📐', label: 'Designing layout',         sub: 'Building cover art, stat cards & charts' },
+      { id: 'assemble',  icon: '🗂', label: 'Assembling report',        sub: 'Compiling sections into final HTML' },
+    ];
+
+    let _genCancelled = false;
+    let _genTimers = [];
+    let _genProgressTimer = null;
+    let _genTarget = 0;
+    let _genCurrent = 0;
+
+    function showGenOverlay(company, topic) {
+      _genCancelled = false;
+      _genTarget = 0; _genCurrent = 0;
+
+      // Set company/topic labels
+      document.getElementById('gen-company-name').textContent = company || 'Generating…';
+      document.getElementById('gen-topic-label').textContent  = topic   || 'Building your branded report…';
+
+      // Build stage rows
+      const list = document.getElementById('gen-stages-list');
+      list.innerHTML = GEN_STAGES_DEF.map(s => `
+        <div class="gen-stage" id="gs-${s.id}">
+          <div class="gen-stage-icon" id="gsicon-${s.id}">${s.icon}</div>
+          <div class="gen-stage-text">
+            <div class="gen-stage-label">${s.label}</div>
+            <div class="gen-stage-sub">${s.sub}</div>
+          </div>
+        </div>`).join('');
+
+      // Reset progress
+      document.getElementById('gen-prog-fill').style.width = '0%';
+      document.getElementById('gen-prog-pct').textContent = '0';
+
+      document.getElementById('gen-overlay').classList.add('visible');
+
+      // Progress ticker
+      clearInterval(_genProgressTimer);
+      _genProgressTimer = setInterval(() => {
+        if (_genCurrent < _genTarget) {
+          _genCurrent = Math.min(_genCurrent + 0.8, _genTarget);
+          const pct = Math.round(_genCurrent);
+          const fill = document.getElementById('gen-prog-fill');
+          const num  = document.getElementById('gen-prog-pct');
+          if (fill) fill.style.width = pct + '%';
+          if (num)  num.textContent  = pct;
+        }
+      }, 30);
+    }
+
+    function hideGenOverlay() {
+      clearInterval(_genProgressTimer);
+      document.getElementById('gen-overlay').classList.remove('visible');
+    }
+
+    function genSetPct(pct)   { _genTarget = Math.min(pct, 99); }
+    function genFinish()      { _genTarget = 100; _genCurrent = 100;
+      const fill = document.getElementById('gen-prog-fill');
+      const num  = document.getElementById('gen-prog-pct');
+      if (fill) fill.style.width = '100%';
+      if (num)  num.textContent  = '100';
+      clearInterval(_genProgressTimer);
+    }
+
+    function genActivateStage(id) {
+      GEN_STAGES_DEF.forEach(s => {
+        const el   = document.getElementById('gs-' + s.id);
+        const icon = document.getElementById('gsicon-' + s.id);
+        if (!el) return;
+        el.classList.remove('gs-active', 'gs-done');
+        if (s.id === id) {
+          el.classList.add('gs-active');
+        } else if (GEN_STAGES_DEF.findIndex(x=>x.id===s.id) < GEN_STAGES_DEF.findIndex(x=>x.id===id)) {
+          el.classList.add('gs-done');
+          if (icon) icon.textContent = '✓';
+        }
+      });
+    }
+
+    function cancelGeneration() {
+      _genCancelled = true;
+      _genTimers.forEach(t => clearTimeout(t));
+      _genTimers = [];
+      hideGenOverlay();
+      setLoading('report-btn', false);
+      setStep(1);
+    }
+
+    // ─────────────────────────────────────────────────────────
     // REPORT GENERATOR
     // ─────────────────────────────────────────────────────────
     async function doReport() {
@@ -1288,75 +1597,50 @@
         title: document.getElementById('report-title').value.trim(),
       };
 
-      // Update step indicators
       setStep(2); setStep(3);
-
-      const statusEl = document.getElementById('report-status');
       setLoading('report-btn', true, 'Generating...');
 
-      // Show progress counter — all stages including render sub-steps
-      const reportStages = [
-        { id: 'scrape',    label: '🔍 Scraping brand' },
-        { id: 'analyse',   label: '🎨 Analysing identity' },
-        { id: 'ai',        label: '🤖 AI structuring' },
-        { id: 'css',       label: '🎨 Brand CSS' },
-        { id: 'cover',     label: '🖼 Cover art' },
-        { id: 'exec',      label: '📋 Exec summary' },
-        { id: 'kpi',       label: '📊 KPI metrics' },
-        { id: 'narrative', label: '📝 Narrative' },
-        { id: 'charts',    label: '📈 Charts' },
-        { id: 'recs',      label: '✅ Recommendations' },
-        { id: 'conclude',  label: '🏁 Conclusion' },
-        { id: 'assemble',  label: '🗂 Assembling HTML' },
-      ];
-      startProgress('#report-result', reportStages);
-
       const company = _extractCompany(url);
+      showGenOverlay(company, describe.length > 80 ? describe.slice(0,77)+'…' : describe);
+      genSetPct(5);
+      genActivateStage('scrape');
 
-      // Phase 1 — Scraping (0–4s)
-      setProgressPct(8);
-      activateStage('scrape', `🔍 Scraping brand identity from ${company}…`);
-      await new Promise(r => setTimeout(r, 400));
-
-      const timers = [
-        // Phase 2 — Brand analysis (4–9s)
-        setTimeout(() => { setProgressPct(30); activateStage('analyse', '🎨 Extracting colors, fonts & visual tokens…'); }, 4000),
-        // Phase 3 — AI structuring (9–22s)
-        setTimeout(() => { setProgressPct(52); activateStage('ai', '🤖 AI writing executive summary & sections…'); }, 9000),
-        // Phase 4 — Render sub-steps (22–38s)
-        setTimeout(() => { setProgressPct(60); activateStage('css',       '🎨 Compiling brand CSS & typography tokens…'); }, 22000),
-        setTimeout(() => { setProgressPct(66); activateStage('cover',     '🖼 Generating cover art SVG…'); },               24500),
-        setTimeout(() => { setProgressPct(72); activateStage('exec',      '📋 Rendering executive summary page…'); },       26500),
-        setTimeout(() => { setProgressPct(77); activateStage('kpi',       '📊 Building KPI stat cards…'); },                28000),
-        setTimeout(() => { setProgressPct(82); activateStage('narrative', '📝 Laying out narrative sections…'); },          29500),
-        setTimeout(() => { setProgressPct(86); activateStage('charts',    '📈 Embedding slope & bar charts…'); },           31000),
-        setTimeout(() => { setProgressPct(90); activateStage('recs',      '✅ Rendering recommendations grid…'); },         32500),
-        setTimeout(() => { setProgressPct(93); activateStage('conclude',  '🏁 Writing conclusion section…'); },             34000),
-        setTimeout(() => { setProgressPct(97); activateStage('assemble',  '🗂 Assembling final HTML document…'); },         35500),
+      _genTimers.forEach(t => clearTimeout(t));
+      _genTimers = [
+        setTimeout(() => { genSetPct(28); genActivateStage('analyse'); }, 4000),
+        setTimeout(() => { genSetPct(55); genActivateStage('ai');      }, 9000),
+        setTimeout(() => { genSetPct(75); genActivateStage('layout');  }, 22000),
+        setTimeout(() => { genSetPct(92); genActivateStage('assemble');}, 34000),
       ];
 
       try {
-        statusEl.textContent = '';
         const data = await post('/api/report', body);
-        timers.forEach(t => clearTimeout(t));
+        _genTimers.forEach(t => clearTimeout(t));
+        _genTimers = [];
+
+        if (_genCancelled) return;
 
         if (data.error) {
-          clearInterval(_progressTimer);
+          hideGenOverlay();
           setStep(1);
           document.getElementById('report-result').innerHTML = '';
           showError('report-result', data.error);
         } else {
-          finishProgress();
-          await new Promise(r => setTimeout(r, 300));
+          genFinish();
+          await new Promise(r => setTimeout(r, 500));
+          hideGenOverlay();
           setStep(4);
           renderReport(data);
+          saveToHistory(data, url, describe);
         }
       } catch(e) {
-        timers.forEach(t => clearTimeout(t));
-        clearInterval(_progressTimer);
-        setStep(1);
-        document.getElementById('report-result').innerHTML = '';
-        showError('report-result', e.message);
+        _genTimers.forEach(t => clearTimeout(t));
+        if (!_genCancelled) {
+          hideGenOverlay();
+          setStep(1);
+          document.getElementById('report-result').innerHTML = '';
+          showError('report-result', e.message);
+        }
       }
       setLoading('report-btn', false);
     }
@@ -1473,7 +1757,100 @@
     }
 
     // ─────────────────────────────────────────────────────────
-    // PROGRESS COUNTER
+    // HISTORY — localStorage
+    // ─────────────────────────────────────────────────────────
+    const HISTORY_KEY = 'brs_history_v1';
+
+    function saveToHistory(data, url, describe) {
+      try {
+        const records = getHistory();
+        records.unshift({
+          id:       Date.now(),
+          title:    data.report_title || data.company || 'Report',
+          company:  data.company || _extractCompany(url),
+          url,
+          describe: describe.slice(0, 120),
+          sections: data.sections || 0,
+          ts:       new Date().toISOString(),
+          html:     data.html,
+        });
+        // Keep last 20
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(records.slice(0, 20)));
+      } catch(e) { /* localStorage quota — ignore */ }
+    }
+
+    function getHistory() {
+      try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); }
+      catch { return []; }
+    }
+
+    function clearHistory() {
+      if (!confirm('Delete all saved reports?')) return;
+      localStorage.removeItem(HISTORY_KEY);
+      renderHistory();
+    }
+
+    function renderHistory() {
+      const grid = document.getElementById('history-grid');
+      if (!grid) return;
+      const records = getHistory();
+      if (!records.length) {
+        grid.innerHTML = `
+          <div class="history-empty">
+            <div class="history-empty-icon">📭</div>
+            <h3>No reports yet</h3>
+            <p>Generate your first report in the <strong>Report Generator</strong> tab — it will appear here automatically.</p>
+          </div>`;
+        return;
+      }
+      grid.innerHTML = `<div class="history-grid">${records.map(r => `
+        <div class="history-card">
+          <div class="history-card-thumb">
+            <span style="font-size:32px;opacity:.3">📄</span>
+          </div>
+          <div class="history-card-body">
+            <div class="history-card-title" title="${escapeHtml(r.title)}">${escapeHtml(r.title)}</div>
+            <div class="history-card-meta">
+              <span>🏢 ${escapeHtml(r.company)}</span>
+              <span>📋 ${r.sections} sections</span>
+              <span>🕒 ${new Date(r.ts).toLocaleDateString()}</span>
+            </div>
+          </div>
+          <div class="history-card-actions">
+            <button class="btn btn-secondary" onclick="openHistoryReport(${r.id})" style="font-size:12px">Open ↗</button>
+            <button class="btn btn-secondary" onclick="downloadHistoryReport(${r.id})" style="font-size:12px">⬇ HTML</button>
+            <button class="btn btn-secondary" onclick="deleteHistoryReport(${r.id})" style="font-size:12px;color:var(--red)">Delete</button>
+          </div>
+        </div>`).join('')}
+      </div>`;
+    }
+
+    function openHistoryReport(id) {
+      const rec = getHistory().find(r => r.id === id);
+      if (!rec?.html) return;
+      const blob = new Blob([rec.html], { type:'text/html' });
+      window.open(URL.createObjectURL(blob), '_blank');
+    }
+
+    function downloadHistoryReport(id) {
+      const rec = getHistory().find(r => r.id === id);
+      if (!rec?.html) return;
+      const blob = new Blob([rec.html], { type:'text/html' });
+      const a = Object.assign(document.createElement('a'), {
+        href: URL.createObjectURL(blob),
+        download: (rec.title||'report').replace(/[^a-z0-9]+/gi,'-')+'.html'
+      });
+      a.click();
+    }
+
+    function deleteHistoryReport(id) {
+      const records = getHistory().filter(r => r.id !== id);
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(records));
+      renderHistory();
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // PROGRESS COUNTER (Brand Discovery)
     // ─────────────────────────────────────────────────────────
     let _progressTimer = null;
     let _progressTarget = 0;
