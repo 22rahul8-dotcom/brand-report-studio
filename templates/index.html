@@ -1129,7 +1129,20 @@
 
     async function post(url, body) {
       const res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
-      return res.json();
+      const ct = res.headers.get('content-type') || '';
+      if (!ct.includes('application/json')) {
+        // Server returned HTML (cold-start page, 502, etc.) — surface a clear message
+        const text = await res.text();
+        if (!res.ok) {
+          throw new Error(`Server error ${res.status}${res.status === 503 || res.status === 502 ? ' — the service may be starting up, please wait 30 seconds and try again' : ''}`);
+        }
+        throw new Error('Unexpected response from server (not JSON). If using Render free tier, the service may be waking up — wait ~30 s and retry.');
+      }
+      const data = await res.json();
+      if (!res.ok && !data.error) {
+        throw new Error(`Server error ${res.status}`);
+      }
+      return data;
     }
 
     function isLight(hex) {
