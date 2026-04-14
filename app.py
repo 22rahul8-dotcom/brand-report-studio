@@ -18,6 +18,24 @@ from flask import Flask, render_template, request, jsonify
 
 app = Flask(__name__)
 
+
+def _firecrawl_error_msg(e: Exception) -> str:
+    """Extract a clean error message from any Firecrawl exception."""
+    msg = str(e)
+    # FirecrawlError stores status_code; surface it cleanly
+    status = getattr(e, 'status_code', None)
+    if status == 402:
+        return "Firecrawl payment required — check your plan/credits at firecrawl.dev"
+    if status == 401:
+        return "Firecrawl API key invalid or missing — set FIRECRAWL_API_KEY"
+    if status == 403:
+        return "Website not supported by Firecrawl (blocked or behind auth)"
+    if status == 429:
+        return "Firecrawl rate limit hit — wait a moment and retry"
+    if status == 501:
+        return f"Firecrawl format not supported for this URL (501) — falling back to basic scrape"
+    return msg
+
 # ---------------------------------------------------------------------------
 # Firecrawl client
 # ---------------------------------------------------------------------------
@@ -180,7 +198,8 @@ def api_brand():
 
         client = get_client()
 
-        # Try with screenshot first; fall back to branding-only; then markdown
+        # Try with screenshot first; fall back to branding-only; then markdown.
+        # Only silently retry on 501 (format not supported); bubble other errors.
         result = None
         last_err = None
         for fmt_set in [["branding", "screenshot"], ["branding"], ["markdown"]]:
@@ -188,11 +207,15 @@ def api_brand():
                 result = client.scrape(url, formats=fmt_set)
                 break
             except Exception as e:
-                last_err = e
-                continue
+                status = getattr(e, 'status_code', None)
+                if status == 501:
+                    last_err = e
+                    continue   # try next format set
+                # Any other error — surface immediately
+                return jsonify({"error": _firecrawl_error_msg(e)}), 500
 
         if result is None:
-            return jsonify({"error": f"Firecrawl scrape failed: {last_err}"}), 500
+            return jsonify({"error": _firecrawl_error_msg(last_err)}), 500
 
         return jsonify({
             "success": True,
@@ -202,7 +225,7 @@ def api_brand():
 
     except Exception as e:
         traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": _firecrawl_error_msg(e)}), 500
 
 
 @app.route("/api/suggest-topics", methods=["POST"])
