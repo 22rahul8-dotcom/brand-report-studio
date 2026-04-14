@@ -179,7 +179,20 @@ def api_brand():
             return jsonify({"error": "URL is required"}), 400
 
         client = get_client()
-        result = client.scrape(url, formats=["branding", "screenshot"])
+
+        # Try with screenshot first; fall back to branding-only; then markdown
+        result = None
+        last_err = None
+        for fmt_set in [["branding", "screenshot"], ["branding"], ["markdown"]]:
+            try:
+                result = client.scrape(url, formats=fmt_set)
+                break
+            except Exception as e:
+                last_err = e
+                continue
+
+        if result is None:
+            return jsonify({"error": f"Firecrawl scrape failed: {last_err}"}), 500
 
         return jsonify({
             "success": True,
