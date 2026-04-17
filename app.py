@@ -423,7 +423,7 @@ Return ONLY the enhanced description. No preamble, no quotes."""
 
 @app.route("/api/report", methods=["POST"])
 def api_report():
-    """Generate a branded magazine report using scraped content — no LLM required."""
+    """Generate a branded magazine report using scraped content."""
     try:
         data = request.get_json()
         url = data.get("url", "").strip()
@@ -437,45 +437,116 @@ def api_report():
         import generate_report
         from pathlib import Path
 
-        # Phase 1-2: Extract brand identity + scrape content
-        brand = brand_scrape.scrape_brand(url, output_dir=os.path.join(os.path.dirname(__file__), "brands"))
-        slug = brand.get("slug", "company")
-        brand_dir_path = os.path.join(os.path.dirname(__file__), "brands", slug)
-
-        # Scrape the page markdown
         firecrawl = get_client()
-        result = _firecrawl_scrape(firecrawl, url, ["markdown"], timeout_sec=22)
-        markdown = getattr(result, "markdown", None) or ""
 
-        company = brand.get("company", slug.title())
+        # ── Phase 1: Brand identity (lightweight — no asset downloads) ──────────
+        # Run branding + markdown scrape in parallel using threads, each with timeout.
+        # This replaces brand_scrape.scrape_brand() which downloads logos/fonts/heroes
+        # and can easily exceed Render's 30-second request limit.
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        brand_result  = None
+        md_result     = None
+        brand_err     = None
+        md_err        = None
+
+        def _scrape_brand_data():
+            return _firecrawl_scrape(firecrawl, url, ["branding"], timeout_sec=18)
+
+        def _scrape_markdown():
+            return _firecrawl_scrape(firecrawl, url, ["markdown"], timeout_sec=18)
+
+        with ThreadPoolExecutor(max_workers=2) as ex:
+            fut_brand = ex.submit(_scrape_brand_data)
+            fut_md    = ex.submit(_scrape_markdown)
+            for fut in as_completed([fut_brand, fut_md]):
+                try:
+                    res = fut.result()
+                    if fut is fut_brand:
+                        brand_result = res
+                    else:
+                        md_result = res
+                except Exception as e:
+                    if fut is fut_brand:
+                        brand_err = e
+                    else:
+                        md_err = e
+
+        # Extract raw brand data
+        raw_branding = {}
+        if brand_result:
+            raw_branding = brand_scrape._to_dict(
+                getattr(brand_result, "branding", None) or
+                (brand_result.get("branding") if isinstance(brand_result, dict) else None) or {}
+            )
+
+        # Extract markdown content
+        markdown = ""
+        if md_result:
+            markdown = getattr(md_result, "markdown", None) or ""
+
+        # Build lightweight brand profile (no logo/font/hero downloads)
+        slug    = brand_scrape.get_slug(url)
+        raw_colors  = raw_branding.get("colors") or {}
+        colors      = brand_scrape.assign_color_roles(raw_colors)
+        fonts       = brand_scrape.process_fonts(raw_branding)
+        style       = brand_scrape.classify_style(raw_branding)
+        personality = raw_branding.get("personality") or {}
+        meta_title  = (getattr(brand_result, "metadata", None) or {})
+        if isinstance(meta_title, object) and hasattr(meta_title, "title"):
+            cname = meta_title.title or slug.replace("-", " ").title()
+        elif isinstance(meta_title, dict):
+            cname = meta_title.get("og_site_name") or meta_title.get("title") or slug.replace("-", " ").title()
+        else:
+            cname = slug.replace("-", " ").title()
+
+        brand = {
+            "company":     cname,
+            "slug":        slug,
+            "url":         url,
+            "colors":      colors,
+            "fonts":       fonts,
+            "assets":      {"logo_svg": "", "logo_png": "", "logo_light": "", "logo_dark": "", "favicon": "", "hero_images": [], "fonts": []},
+            "brand_voice": {
+                "tone":    personality.get("traits", ["professional"]),
+                "tagline": personality.get("tagline", ""),
+            },
+            "design_language": {"style": style},
+        }
+
+        brand_dir_path = os.path.join(os.path.dirname(__file__), "brands", slug)
+        os.makedirs(brand_dir_path, exist_ok=True)
+
+        company      = brand["company"]
         report_title = title or f"{company} — Company Overview"
 
-        # Phase 3: Structure content with Groq or OpenRouter
+        # ── Phase 2: Structure content with LLM ─────────────────────────────────
         llm_client, llm_models = _get_llm_client()
         if llm_client and markdown:
-            structured = _structure_with_groq(llm_client, markdown, company, report_title, data.get("describe", ""), models=llm_models)
+            structured = _structure_with_groq(llm_client, markdown, company, report_title,
+                                              data.get("describe", ""), models=llm_models)
         else:
             structured = _auto_structure(markdown, company, report_title, data.get("describe", ""))
 
         if title:
             structured["title"] = title
 
-        # Phase 4: Render HTML
+        # ── Phase 3: Render HTML ─────────────────────────────────────────────────
         html = generate_report.generate_html(structured, brand, Path(brand_dir_path), report_title)
 
         return jsonify({
-            "success": True,
-            "html": html,
+            "success":      True,
+            "html":         html,
             "report_title": report_title,
-            "company": company,
-            "sections": len(structured.get("sections", [])),
-            "style": brand.get("design_language", {}).get("style", ""),
-            "timestamp": datetime.now().isoformat(),
+            "company":      company,
+            "sections":     len(structured.get("sections", [])),
+            "style":        style,
+            "timestamp":    datetime.now().isoformat(),
         })
 
     except Exception as e:
         traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": str(e) or "Report generation failed — please try again"}), 500
 
 
 def _structure_with_groq(client, markdown: str, company: str, title: str, describe: str = "", models: list = None) -> dict:
