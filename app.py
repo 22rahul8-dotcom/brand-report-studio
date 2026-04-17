@@ -9,6 +9,7 @@ import json
 import os
 import sys
 import traceback
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
 from datetime import datetime
 
 from dotenv import load_dotenv
@@ -17,6 +18,34 @@ load_dotenv()
 from flask import Flask, render_template, request, jsonify
 
 app = Flask(__name__)
+
+
+# ── Global error handlers (backstop — returns JSON instead of Flask HTML) ──────
+@app.errorhandler(500)
+def handle_500(e):
+    return jsonify({"error": str(e) or "Internal server error — please try again"}), 500
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    traceback.print_exc()
+    return jsonify({"error": str(e) or "Unexpected server error — please try again"}), 500
+
+
+# ── Firecrawl call with timeout ────────────────────────────────────────────────
+def _firecrawl_scrape(client, url: str, formats: list, timeout_sec: int = 22):
+    """
+    Run client.scrape() in a thread with a hard timeout.
+    Raises RuntimeError if it takes longer than timeout_sec (prevents Render 30s kill).
+    """
+    with ThreadPoolExecutor(max_workers=1) as ex:
+        fut = ex.submit(client.scrape, url, formats=formats)
+        try:
+            return fut.result(timeout=timeout_sec)
+        except FutureTimeout:
+            raise RuntimeError(
+                f"Scraping timed out after {timeout_sec}s — "
+                "this site may be slow or bot-protected. Try the homepage URL."
+            )
 
 
 def _firecrawl_error_msg(e: Exception) -> str:
@@ -211,13 +240,13 @@ def api_brand():
         last_err = None
         for fmt_set in [["branding", "screenshot"], ["branding"], ["markdown"]]:
             try:
-                result = client.scrape(url, formats=fmt_set)
+                result = _firecrawl_scrape(client, url, fmt_set, timeout_sec=22)
                 break
             except Exception as e:
                 status = getattr(e, 'status_code', None)
                 if status in HARD_FAIL_STATUSES:
                     return jsonify({"error": _firecrawl_error_msg(e)}), 500
-                # 501, 500, 422, or any other transient error → try simpler format
+                # Timeout, 501, 500, 422, or other transient → try simpler format
                 last_err = e
                 continue
 
@@ -415,7 +444,7 @@ def api_report():
 
         # Scrape the page markdown
         firecrawl = get_client()
-        result = firecrawl.scrape(url, formats=["markdown"])
+        result = _firecrawl_scrape(firecrawl, url, ["markdown"], timeout_sec=22)
         markdown = getattr(result, "markdown", None) or ""
 
         company = brand.get("company", slug.title())
