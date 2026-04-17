@@ -222,10 +222,16 @@ def build_css(brand: dict) -> str:
     accent_dark = _ensure_contrast(accent, on_dark=True)
     accent_lite = _lighten(accent, 0.72)
     primary     = c.get("primary", "#0a0a0f")
+    bg_color    = c.get("background", "#ffffff")
     text        = c.get("text_primary", "#111111")
     text2       = c.get("text_secondary", "#555555")
-    # Cover bg: must be dark. If primary is dark use it, otherwise fall back.
-    # But also reject very saturated bright colors (like pure #0000ff) — darken them hard.
+
+    # ── Cover background selection ──────────────────────────────────────────
+    # Priority order (each must be: dark AND not too-saturated):
+    #   1. Site's actual background (most authentic for dark-theme brands)
+    #   2. Brand primary color
+    #   3. Darkened/tinted version of primary (if primary is too saturated)
+    #   4. Hard fallback near-black
     def _is_too_saturated(hex_color: str) -> bool:
         try:
             r2, g2, b2 = _hex_to_rgb(hex_color)
@@ -236,14 +242,30 @@ def build_css(brand: dict) -> str:
         except Exception:
             return False
 
-    if _is_dark(primary) and not _is_too_saturated(primary):
-        cover_bg = primary
-    elif _is_too_saturated(primary):
-        # Very saturated dark color (e.g. pure blue #0000ff) → crush to near-black tinted
-        r2, g2, b2 = _hex_to_rgb(primary)
-        cover_bg = f"#{max(0,r2//6):02x}{max(0,g2//6):02x}{max(0,b2//6):02x}"
-    else:
-        cover_bg = "#0a0a0f"
+    def _is_white_or_near_white(hex_color: str) -> bool:
+        try:
+            r2, g2, b2 = _hex_to_rgb(hex_color)
+            return (r2 + g2 + b2) > 600  # very light colors
+        except Exception:
+            return True
+
+    cover_bg = None
+    # 1. Use site background if it's a proper dark color (authentic dark-theme brands)
+    if (bg_color and bg_color != "#ffffff"
+            and _is_dark(bg_color)
+            and not _is_too_saturated(bg_color)
+            and not _is_white_or_near_white(bg_color)):
+        cover_bg = bg_color
+    # 2. Fall back to primary
+    if cover_bg is None:
+        if _is_dark(primary) and not _is_too_saturated(primary):
+            cover_bg = primary
+        elif _is_too_saturated(primary):
+            # Very saturated dark color (e.g. pure blue #0000ff) → tint to near-black
+            r2, g2, b2 = _hex_to_rgb(primary)
+            cover_bg = f"#{max(0,r2//6):02x}{max(0,g2//6):02x}{max(0,b2//6):02x}"
+        else:
+            cover_bg = "#0a0a0f"
 
     heading_family = (f.get("heading", {}).get("family", "Inter")
                       if isinstance(f, dict) else "Inter")

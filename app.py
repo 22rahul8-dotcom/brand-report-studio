@@ -29,12 +29,17 @@ def _firecrawl_error_msg(e: Exception) -> str:
     if status == 401:
         return "Firecrawl API key invalid or missing — set FIRECRAWL_API_KEY"
     if status == 403:
-        return "Website not supported by Firecrawl (blocked or behind auth)"
+        return "Website blocked by Firecrawl — this site may not allow scraping"
     if status == 429:
         return "Firecrawl rate limit hit — wait a moment and retry"
     if status == 501:
-        return f"Firecrawl format not supported for this URL (501) — falling back to basic scrape"
-    return msg
+        return "Firecrawl format not supported for this URL (501)"
+    if status == 500:
+        return "Firecrawl server error scraping this URL — try again or use a different URL"
+    if status == 422:
+        return "Firecrawl could not process this URL — try the homepage instead"
+    # Never return empty — always give a useful fallback
+    return msg or (f"Firecrawl error (status {status})" if status else "Unknown scraping error — check the URL and try again")
 
 # ---------------------------------------------------------------------------
 # Firecrawl client
@@ -199,7 +204,9 @@ def api_brand():
         client = get_client()
 
         # Try with screenshot first; fall back to branding-only; then markdown.
-        # Only silently retry on 501 (format not supported); bubble other errors.
+        # Retry on any Firecrawl scrape error EXCEPT hard failures (auth/billing/rate-limit).
+        # Hard failures (401, 402, 403, 429) mean something the user must fix — surface immediately.
+        HARD_FAIL_STATUSES = {401, 402, 403, 429}
         result = None
         last_err = None
         for fmt_set in [["branding", "screenshot"], ["branding"], ["markdown"]]:
@@ -208,14 +215,15 @@ def api_brand():
                 break
             except Exception as e:
                 status = getattr(e, 'status_code', None)
-                if status == 501:
-                    last_err = e
-                    continue   # try next format set
-                # Any other error — surface immediately
-                return jsonify({"error": _firecrawl_error_msg(e)}), 500
+                if status in HARD_FAIL_STATUSES:
+                    return jsonify({"error": _firecrawl_error_msg(e)}), 500
+                # 501, 500, 422, or any other transient error → try simpler format
+                last_err = e
+                continue
 
         if result is None:
-            return jsonify({"error": _firecrawl_error_msg(last_err)}), 500
+            err_msg = _firecrawl_error_msg(last_err) if last_err else "Could not scrape this URL — try the homepage"
+            return jsonify({"error": err_msg}), 500
 
         return jsonify({
             "success": True,

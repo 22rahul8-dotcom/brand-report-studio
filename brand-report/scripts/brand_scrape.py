@@ -637,20 +637,29 @@ def scrape_brand(url: str, output_dir: str = "./brands", force: bool = False) ->
     client = get_firecrawl_client()
 
     # ── Step 1: Homepage branding ──
+    # Attempt branding+links first; fall back to branding-only; then markdown-only.
+    # Hard failures (401/402/403/429) bubble up. Other errors (500/501/422) trigger fallback.
+    HARD_FAIL = {401, 402, 403, 429}
     print("  → Extracting branding data (homepage)...")
-    try:
-        result     = client.scrape(url, formats=["branding", "links"])
-        brand_data = _to_dict(
-            getattr(result, "branding", None) or
-            (result.get("branding") if isinstance(result, dict) else None) or {}
-        )
-        raw_links = _to_dict(
-            getattr(result, "links", None) or
-            (result.get("links") if isinstance(result, dict) else None) or []
-        )
-    except Exception as e:
-        print(f"  ⚠ Scrape error: {e}. Continuing with defaults.", file=sys.stderr)
-        brand_data, raw_links = {}, []
+    brand_data, raw_links = {}, []
+    result = None
+    for fmt_set in [["branding", "links"], ["branding"], ["markdown"]]:
+        try:
+            result = client.scrape(url, formats=fmt_set)
+            brand_data = _to_dict(
+                getattr(result, "branding", None) or
+                (result.get("branding") if isinstance(result, dict) else None) or {}
+            )
+            raw_links = _to_dict(
+                getattr(result, "links", None) or
+                (result.get("links") if isinstance(result, dict) else None) or []
+            )
+            break  # success
+        except Exception as e:
+            status = getattr(e, "status_code", None)
+            if status in HARD_FAIL:
+                raise  # propagate auth/billing errors
+            print(f"  ⚠ Scrape error ({fmt_set}): {e}. Trying simpler format…", file=sys.stderr)
 
     if not brand_data:
         print("  ⚠ No branding data returned — defaults will be used.")
