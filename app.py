@@ -15,9 +15,15 @@ from datetime import datetime
 from dotenv import load_dotenv
 load_dotenv()
 
+import threading
+import uuid
 from flask import Flask, render_template, request, jsonify
 
 app = Flask(__name__)
+
+# ── Async job store (in-memory, single-instance) ───────────────────────────────
+_jobs: dict = {}          # job_id → {"status": "pending|done|error", "result": {}}
+_jobs_lock = threading.Lock()
 
 
 # ── Global error handlers (backstop — returns JSON instead of Flask HTML) ──────
@@ -36,9 +42,14 @@ def _firecrawl_scrape(client, url: str, formats: list, timeout_sec: int = 22):
     """
     Run client.scrape() in a thread with a hard timeout.
     Raises RuntimeError if it takes longer than timeout_sec (prevents Render 30s kill).
+    Firecrawl 4.x valid formats: markdown, html, rawHtml, links, screenshot, branding, summary
     """
+    # Sanitise formats — only pass known-valid v2 format strings
+    VALID_FORMATS = {"markdown", "html", "rawHtml", "links", "screenshot", "branding", "summary"}
+    safe_formats = [f for f in formats if f in VALID_FORMATS] or ["markdown"]
+
     with ThreadPoolExecutor(max_workers=1) as ex:
-        fut = ex.submit(client.scrape, url, formats=formats)
+        fut = ex.submit(client.scrape, url, formats=safe_formats)
         try:
             return fut.result(timeout=timeout_sec)
         except FutureTimeout:
@@ -421,40 +432,26 @@ Return ONLY the enhanced description. No preamble, no quotes."""
 # Routes — Report Generator
 # ---------------------------------------------------------------------------
 
-@app.route("/api/report", methods=["POST"])
-def api_report():
-    """Generate a branded magazine report using scraped content."""
+def _run_report_job(job_id: str, url: str, title: str, describe: str):
+    """Run the full report pipeline in a background thread. Stores result in _jobs."""
     try:
-        data = request.get_json()
-        url = data.get("url", "").strip()
-        if not url:
-            return jsonify({"error": "Company URL is required"}), 400
-
-        title = data.get("title", "").strip()
-
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), "brand-report", "scripts"))
         import brand_scrape
         import generate_report
         from pathlib import Path
+        from concurrent.futures import as_completed
 
         firecrawl = get_client()
 
-        # ── Phase 1: Brand identity (lightweight — no asset downloads) ──────────
-        # Run branding + markdown scrape in parallel using threads, each with timeout.
-        # This replaces brand_scrape.scrape_brand() which downloads logos/fonts/heroes
-        # and can easily exceed Render's 30-second request limit.
-        from concurrent.futures import ThreadPoolExecutor, as_completed
-
-        brand_result  = None
-        md_result     = None
-        brand_err     = None
-        md_err        = None
+        # ── Phase 1: Parallel brand + markdown scrape ───────────────────────────
+        brand_result = None
+        md_result    = None
 
         def _scrape_brand_data():
-            return _firecrawl_scrape(firecrawl, url, ["branding"], timeout_sec=18)
+            return _firecrawl_scrape(firecrawl, url, ["branding"], timeout_sec=20)
 
         def _scrape_markdown():
-            return _firecrawl_scrape(firecrawl, url, ["markdown"], timeout_sec=18)
+            return _firecrawl_scrape(firecrawl, url, ["markdown"], timeout_sec=20)
 
         with ThreadPoolExecutor(max_workers=2) as ex:
             fut_brand = ex.submit(_scrape_brand_data)
@@ -466,13 +463,10 @@ def api_report():
                         brand_result = res
                     else:
                         md_result = res
-                except Exception as e:
-                    if fut is fut_brand:
-                        brand_err = e
-                    else:
-                        md_err = e
+                except Exception:
+                    pass  # Non-fatal — proceed with whatever we got
 
-        # Extract raw brand data
+        # ── Phase 2: Extract brand data ─────────────────────────────────────────
         raw_branding = {}
         if brand_result:
             raw_branding = brand_scrape._to_dict(
@@ -480,37 +474,34 @@ def api_report():
                 (brand_result.get("branding") if isinstance(brand_result, dict) else None) or {}
             )
 
-        # Extract markdown content
         markdown = ""
         if md_result:
             markdown = getattr(md_result, "markdown", None) or ""
 
-        # Build lightweight brand profile (no logo/font/hero downloads)
-        slug    = brand_scrape.get_slug(url)
+        slug        = brand_scrape.get_slug(url)
         raw_colors  = raw_branding.get("colors") or {}
         colors      = brand_scrape.assign_color_roles(raw_colors)
         fonts       = brand_scrape.process_fonts(raw_branding)
         style       = brand_scrape.classify_style(raw_branding)
         personality = raw_branding.get("personality") or {}
-        meta_title  = (getattr(brand_result, "metadata", None) or {})
-        if isinstance(meta_title, object) and hasattr(meta_title, "title"):
-            cname = meta_title.title or slug.replace("-", " ").title()
-        elif isinstance(meta_title, dict):
-            cname = meta_title.get("og_site_name") or meta_title.get("title") or slug.replace("-", " ").title()
+
+        # Best-effort company name from metadata
+        meta = getattr(brand_result, "metadata", None) or {}
+        if hasattr(meta, "title"):
+            cname = meta.title or slug.replace("-", " ").title()
+        elif isinstance(meta, dict):
+            cname = meta.get("og_site_name") or meta.get("title") or slug.replace("-", " ").title()
         else:
             cname = slug.replace("-", " ").title()
 
         brand = {
-            "company":     cname,
-            "slug":        slug,
-            "url":         url,
-            "colors":      colors,
-            "fonts":       fonts,
-            "assets":      {"logo_svg": "", "logo_png": "", "logo_light": "", "logo_dark": "", "favicon": "", "hero_images": [], "fonts": []},
-            "brand_voice": {
-                "tone":    personality.get("traits", ["professional"]),
-                "tagline": personality.get("tagline", ""),
-            },
+            "company":  cname,
+            "slug":     slug,
+            "url":      url,
+            "colors":   colors,
+            "fonts":    fonts,
+            "assets":   {"logo_svg": "", "logo_png": "", "logo_light": "", "logo_dark": "", "favicon": "", "hero_images": [], "fonts": []},
+            "brand_voice":    {"tone": personality.get("traits", ["professional"]), "tagline": personality.get("tagline", "")},
             "design_language": {"style": style},
         }
 
@@ -520,21 +511,21 @@ def api_report():
         company      = brand["company"]
         report_title = title or f"{company} — Company Overview"
 
-        # ── Phase 2: Structure content with LLM ─────────────────────────────────
+        # ── Phase 3: LLM content structuring ───────────────────────────────────
         llm_client, llm_models = _get_llm_client()
         if llm_client and markdown:
             structured = _structure_with_groq(llm_client, markdown, company, report_title,
-                                              data.get("describe", ""), models=llm_models)
+                                              describe, models=llm_models)
         else:
-            structured = _auto_structure(markdown, company, report_title, data.get("describe", ""))
+            structured = _auto_structure(markdown, company, report_title, describe)
 
         if title:
             structured["title"] = title
 
-        # ── Phase 3: Render HTML ─────────────────────────────────────────────────
+        # ── Phase 4: Render HTML ────────────────────────────────────────────────
         html = generate_report.generate_html(structured, brand, Path(brand_dir_path), report_title)
 
-        return jsonify({
+        result = {
             "success":      True,
             "html":         html,
             "report_title": report_title,
@@ -542,11 +533,51 @@ def api_report():
             "sections":     len(structured.get("sections", [])),
             "style":        style,
             "timestamp":    datetime.now().isoformat(),
-        })
+        }
+        with _jobs_lock:
+            _jobs[job_id] = {"status": "done", "result": result}
 
     except Exception as e:
         traceback.print_exc()
-        return jsonify({"error": str(e) or "Report generation failed — please try again"}), 500
+        with _jobs_lock:
+            _jobs[job_id] = {"status": "error", "result": {"error": str(e) or "Report generation failed — please try again"}}
+
+
+@app.route("/api/report", methods=["POST"])
+def api_report():
+    """Start async report generation. Returns job_id immediately."""
+    try:
+        data = request.get_json()
+        url  = data.get("url", "").strip()
+        if not url:
+            return jsonify({"error": "Company URL is required"}), 400
+
+        job_id = str(uuid.uuid4())[:8]
+        with _jobs_lock:
+            _jobs[job_id] = {"status": "pending", "result": None}
+
+        t = threading.Thread(
+            target=_run_report_job,
+            args=(job_id, url, data.get("title", "").strip(), data.get("describe", "")),
+            daemon=True,
+        )
+        t.start()
+
+        return jsonify({"job_id": job_id, "status": "pending"})
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/report/<job_id>", methods=["GET"])
+def api_report_status(job_id):
+    """Poll report job status. Returns {status, result} once done."""
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+    if not job:
+        return jsonify({"error": "Job not found"}), 404
+    return jsonify({"status": job["status"], "result": job["result"]})
 
 
 def _structure_with_groq(client, markdown: str, company: str, title: str, describe: str = "", models: list = None) -> dict:

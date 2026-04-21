@@ -1628,7 +1628,24 @@
       ];
 
       try {
-        const data = await post('/api/report', body);
+        // Step 1: Start job (returns immediately with job_id)
+        const startResp = await post('/api/report', body);
+        if (startResp.error) throw new Error(startResp.error);
+        const jobId = startResp.job_id;
+
+        // Step 2: Poll until done
+        let data = null;
+        while (true) {
+          if (_genCancelled) return;
+          await new Promise(r => setTimeout(r, 3000));
+          if (_genCancelled) return;
+          const poll = await fetch(`/api/report/${jobId}`);
+          const pollData = await poll.json();
+          if (pollData.status === 'done') { data = pollData.result; break; }
+          if (pollData.status === 'error') throw new Error(pollData.result?.error || 'Report generation failed');
+          // still pending — keep polling
+        }
+
         _genTimers.forEach(t => clearTimeout(t));
         _genTimers = [];
 
